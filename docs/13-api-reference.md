@@ -116,6 +116,8 @@ CodexClientConfig.builder()
     .workspaceNetworkAccess(boolean)
     .configOverride(String)
     .configOverrides(List<String>)
+    .mcpServer(String name, McpServerConfig config)
+    .mcpServers(Map<String, McpServerConfig> configs)
     .clientInfo(String name, String title, String version)
     .experimentalApi(boolean)
     .requestTimeout(Duration)
@@ -139,6 +141,17 @@ CodexClientConfig.builder()
 | requestTimeout | 60 秒 |
 | retryPolicy | 过载最多尝试 3 次，250 ms 起始指数退避 |
 | 审批处理器 | 接受命令执行和文件修改审批 |
+
+### MCP 配置
+
+通过 `McpServerConfig.stdio(String)` 或 `McpServerConfig.streamableHttp(URI)` 创建。
+
+两种 Builder 共享 `enabled`、`required`、两个 `Duration` 超时、并行调用开关、工具白/黑名单、
+默认审批模式和单工具审批配置。stdio 专用方法为 `args`、`env`、`envVar`、`cwd`；HTTP 专用方法为
+`bearerTokenEnvVar`、`httpHeader`、`envHttpHeader`、`auth`、`oauth`。
+
+环境变量引用使用 `McpEnvVar.inherit/local/remote`，工具审批使用
+`McpToolConfig.approval(...)`，OAuth 使用 `McpOAuthConfig.builder()`。
 
 ## 3. ThreadOptions
 

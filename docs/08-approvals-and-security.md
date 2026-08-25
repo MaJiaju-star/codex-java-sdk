@@ -173,6 +173,27 @@ ToolObserver observer = new ToolObserver() {
 `ApprovalHandler` 或 `ToolInterceptor` 的授权决定。当前 `onOutput` 用于命令输出；
 文件补丁和 MCP 进度可结合原始枚举事件展示。
 
+MCP Server 注册时不要把 bearer token 写入 `httpHeader(...)` 或原始
+`configOverride(...)`。优先使用环境变量引用：
+
+```java
+CodexClientConfig.builder()
+        .environment("MCP_TOKEN", token)
+        .mcpServer("internal", McpServerConfig.streamableHttp(mcpUri)
+                .bearerTokenEnvVar("MCP_TOKEN")
+                .envHttpHeader("X-Api-Key", "MCP_API_KEY")
+                .defaultToolsApprovalMode(McpToolApprovalMode.PROMPT)
+                .tool("read", McpToolConfig.approval(McpToolApprovalMode.APPROVE))
+                .tool("write", McpToolConfig.approval(McpToolApprovalMode.WRITES))
+                .build())
+        .build();
+```
+
+`httpHeader(...)` 适合非敏感固定 Header；`envHttpHeader(header, envName)` 的第二个参数是
+环境变量名称，不是密钥值。MCP 配置会出现在 app-server 命令行的 `--config` 参数中，因此
+不要把任何凭据直接放进配置字符串。stdio 的 `env(name, value)` 同样只适合非敏感固定值；
+密钥应通过 `CodexClientConfig.environment(...)` 注入，再用 `McpEnvVar.inherit(...)` 引用变量名。
+
 `ToolCallResult.successful()` 不只检查 `error` 字段：完成 Item 的状态为 `failed` 或
 `declined` 时，即使没有独立错误对象也会返回 `false`。日志中应删除密钥、认证头、
 敏感文件内容和个人数据。

@@ -42,6 +42,7 @@ CodexClientConfig config = CodexClientConfig.builder()
 | `webSearch(WebSearchMode)` | `web_search` |
 | `approvalPolicy(ApprovalPolicy)` | `approval_policy` |
 | `workspaceNetworkAccess(boolean)` | `sandbox_workspace_write.network_access` |
+| `mcpServer(String, McpServerConfig)` | `mcp_servers.<name>` |
 
 具名 API 会排在原始 `configOverride(s)` 后面，因此相同配置键以具名 API 为准。未提供
 具名方法的高级配置仍可通过 `configOverride("key=value")` 传递。
@@ -136,6 +137,87 @@ CompletableFuture<JsonNode> future = codex.requestAsync("thread/list", mapper.cr
 
 `RetryPolicy.overloadDefaults()` 是默认值，只对服务端明确报告的入口过载做指数退避
 重试。使用 `RetryPolicy.disabled()` 可关闭，完整说明见第 11 章。
+
+### 1.9 MCP Server
+
+`mcpServer(name, config)` 将强类型配置转换为 app-server 启动参数。它只对当前
+`CodexClient` 子进程生效，不会写入全局 `config.toml`。同名 Server 注册多次时，最后一次生效。
+由于 Codex CLI dotted override 的限制，名称只能包含字母、数字、下划线和连字符。
+
+stdio MCP Server：
+
+```java
+McpServerConfig server = McpServerConfig.stdio("npx")
+        .args("-y", "@modelcontextprotocol/server-filesystem", "D:/workspace")
+        .env("LOG_LEVEL", "info")
+        .envVar(McpEnvVar.inherit("HOME"))
+        .envVar(McpEnvVar.remote("REMOTE_TOKEN"))
+        .cwd(Path.of("D:/workspace"))
+        .enabled(true)
+        .required(true)
+        .startupTimeout(Duration.ofSeconds(10))
+        .toolTimeout(Duration.ofSeconds(60))
+        .supportsParallelToolCalls(true)
+        .enabledTools("read_file", "write_file")
+        .disabledTools("delete_file")
+        .defaultToolsApprovalMode(McpToolApprovalMode.PROMPT)
+        .tool("read_file", McpToolConfig.approval(McpToolApprovalMode.APPROVE))
+        .tool("write_file", McpToolConfig.approval(McpToolApprovalMode.WRITES))
+        .build();
+
+CodexClientConfig config = CodexClientConfig.builder()
+        .mcpServer("filesystem", server)
+        .build();
+```
+
+Streamable HTTP MCP Server：
+
+```java
+McpServerConfig server = McpServerConfig.streamableHttp(
+                URI.create("https://mcp.internal.example.com/mcp"))
+        .bearerTokenEnvVar("MCP_TOKEN")
+        .httpHeader("X-Tenant", "internal")
+        .envHttpHeader("Authorization", "MCP_AUTH_HEADER")
+        .auth(McpAuthMode.OAUTH)
+        .oauth(McpOAuthConfig.builder()
+                .clientId("internal-client")
+                .callbackPort(8765)
+                .build())
+        .enabled(true)
+        .build();
+
+CodexClientConfig config = CodexClientConfig.builder()
+        .environment("MCP_TOKEN", System.getenv("MCP_TOKEN"))
+        .environment("MCP_AUTH_HEADER", System.getenv("MCP_AUTH_HEADER"))
+        .mcpServer("internal", server)
+        .build();
+```
+
+字段映射：
+
+| Builder 方法 | Codex 配置键 | 传输 |
+|---|---|---|
+| `args(...)` | `args` | stdio |
+| `env(name, value)` | `env` | stdio |
+| `envVar(...)` | `env_vars` | stdio |
+| `cwd(Path)` | `cwd` | stdio |
+| `bearerTokenEnvVar(String)` | `bearer_token_env_var` | HTTP |
+| `httpHeader(name, value)` | `http_headers` | HTTP |
+| `envHttpHeader(name, envName)` | `env_http_headers` | HTTP |
+| `auth(McpAuthMode)` | `auth` | HTTP |
+| `oauth(McpOAuthConfig)` | `oauth` | HTTP |
+| `enabled(boolean)` | `enabled` | 两者 |
+| `required(boolean)` | `required` | 两者 |
+| `startupTimeout(Duration)` | `startup_timeout_sec` | 两者 |
+| `toolTimeout(Duration)` | `tool_timeout_sec` | 两者 |
+| `supportsParallelToolCalls(boolean)` | `supports_parallel_tool_calls` | 两者 |
+| `enabledTools(...)` | `enabled_tools` | 两者 |
+| `disabledTools(...)` | `disabled_tools` | 两者 |
+| `defaultToolsApprovalMode(...)` | `default_tools_approval_mode` | 两者 |
+| `tool(name, config)` | `tools.<tool>.approval_mode` | 两者 |
+
+`enabledTools()` 的空参数形式会显式写入空白名单，即不暴露任何工具；从未调用该方法则不设置
+白名单。工具审批模式包括 `AUTO`、`PROMPT`、`WRITES` 和 `APPROVE`。
 
 ## 2. ThreadOptions
 

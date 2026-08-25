@@ -8,6 +8,8 @@ import io.github.majiajustar.codex.tool.ToolCallContext;
 import io.github.majiajustar.codex.tool.ToolInterceptor;
 import io.github.majiajustar.codex.tool.ToolObserver;
 import io.github.majiajustar.codex.internal.JsonSupport;
+import io.github.majiajustar.codex.internal.McpConfigOverrideSerializer;
+import io.github.majiajustar.codex.mcp.McpServerConfig;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -132,6 +134,7 @@ public record CodexClientConfig(
         private Path workingDirectory;
         private final Map<String, String> environment = new LinkedHashMap<>();
         private final List<String> configOverrides = new ArrayList<>();
+        private final Map<String, McpServerConfig> mcpServers = new LinkedHashMap<>();
         private String baseUrl;
         private String model;
         private String modelProvider;
@@ -235,6 +238,19 @@ public record CodexClientConfig(
             return this;
         }
 
+        /** 注册一个在 app-server 启动时初始化的 MCP Server；同名配置以后一次为准。 */
+        public Builder mcpServer(String name, McpServerConfig config) {
+            McpConfigOverrideSerializer.validateName(name);
+            mcpServers.put(name, Objects.requireNonNull(config, "config"));
+            return this;
+        }
+
+        /** 批量注册在 app-server 启动时初始化的 MCP Server。 */
+        public Builder mcpServers(Map<String, McpServerConfig> configs) {
+            Objects.requireNonNull(configs, "configs").forEach(this::mcpServer);
+            return this;
+        }
+
         /** 设置初始化请求中发送的客户端身份信息。 */
         public Builder clientInfo(String name, String title, String version) {
             clientName = name;
@@ -315,6 +331,8 @@ public record CodexClientConfig(
                 resolvedOverrides.add(
                         "sandbox_workspace_write.network_access=" + workspaceNetworkAccess);
             }
+            mcpServers.forEach((name, config) ->
+                    resolvedOverrides.add(McpConfigOverrideSerializer.serialize(name, config)));
             return new CodexClientConfig(
                     withConfigOverrides(command, resolvedOverrides),
                     workingDirectory,

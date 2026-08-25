@@ -61,12 +61,14 @@ import io.github.majiajustar.codex.*;
 import io.github.majiajustar.codex.event.*;
 import io.github.majiajustar.codex.exception.*;
 import io.github.majiajustar.codex.generated.v2.*;
+import io.github.majiajustar.codex.mcp.*;
 import io.github.majiajustar.codex.model.*;
 import io.github.majiajustar.codex.sandbox.*;
 import io.github.majiajustar.codex.thread.*;
 import io.github.majiajustar.codex.tool.*;
 import io.github.majiajustar.codex.turn.*;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;

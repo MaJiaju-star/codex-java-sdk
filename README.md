@@ -70,6 +70,7 @@ io.github.majiajustar.codex            客户端、配置、Thread/Turn 运行�
 io.github.majiajustar.codex.thread     Thread 配置和列表选项
 io.github.majiajustar.codex.turn       Turn 配置、输入、结果和 Usage
 io.github.majiajustar.codex.event      事件、通知和 Item
+io.github.majiajustar.codex.mcp        MCP Server 注册、认证和工具审批配置
 io.github.majiajustar.codex.model      模型目录类型
 io.github.majiajustar.codex.tool       审批、拦截器和工具生命周期
 io.github.majiajustar.codex.sandbox    沙箱策略
@@ -109,6 +110,37 @@ CodexClientConfig config = CodexClientConfig.builder()
 
 `apiKey(...)` 只会通过 `OPENAI_API_KEY` 环境变量传递给 app-server 子进程，不会出现在命令行中。
 具名配置会覆盖相同的原始 `configOverride(...)` 配置项。
+
+## 注册 MCP Server
+
+MCP Server 在创建 `CodexClient` 时通过强类型配置注册，不会修改用户的全局
+`~/.codex/config.toml`。stdio 示例：
+
+```java
+McpServerConfig filesystem = McpServerConfig.stdio("npx")
+        .args("-y", "@modelcontextprotocol/server-filesystem", "D:/workspace")
+        .env("LOG_LEVEL", "info")
+        .envVar(McpEnvVar.inherit("HOME"))
+        .cwd(Path.of("D:/workspace"))
+        .enabled(true)
+        .required(true)
+        .startupTimeout(Duration.ofSeconds(10))
+        .toolTimeout(Duration.ofSeconds(60))
+        .supportsParallelToolCalls(true)
+        .enabledTools("read_file", "write_file")
+        .defaultToolsApprovalMode(McpToolApprovalMode.PROMPT)
+        .tool("read_file", McpToolConfig.approval(McpToolApprovalMode.APPROVE))
+        .build();
+
+CodexClientConfig config = CodexClientConfig.builder()
+        .mcpServer("filesystem", filesystem)
+        .build();
+```
+
+Streamable HTTP 使用 `McpServerConfig.streamableHttp(URI)` 创建，并支持认证头、环境变量认证头及
+OAuth 配置。SDK 不提供明文 bearer token 配置；`bearerTokenEnvVar(...)` 只把环境变量名称写入
+Codex 配置，实际密钥通过子进程环境传递。完整示例、字段和安全说明见
+[配置教程](docs/03-configuration.md)与[审批、安全和沙箱](docs/08-approvals-and-security.md)。
 
 ## 流式事件
 
