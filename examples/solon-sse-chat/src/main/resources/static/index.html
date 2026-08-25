@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Java SDK · Solon SSE</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#121a2d; --line:#26334d; --text:#e9eefc; --muted:#91a0bd; --accent:#62d7b0; --danger:#ff7d88; --code:#090e19; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; font:14px/1.55 Inter,ui-sans-serif,system-ui,sans-serif; color:var(--text); background:radial-gradient(circle at 20% 0,#182847 0,transparent 32%),var(--bg); }
+    button,input,textarea,select { font:inherit; }
+    button { border:1px solid var(--line); border-radius:9px; padding:8px 12px; color:var(--text); background:#1b2740; cursor:pointer; }
+    button:hover { border-color:var(--accent); } button.primary { color:#071812; background:var(--accent); border-color:var(--accent); font-weight:700; } button.danger { color:var(--danger); }
+    input,textarea,select { width:100%; border:1px solid var(--line); border-radius:9px; padding:10px 12px; color:var(--text); background:#0d1527; outline:none; } input:focus,textarea:focus,select:focus { border-color:var(--accent); }
+    .app { display:grid; grid-template-columns:280px minmax(400px,1fr) 360px; height:100vh; }
+    aside,main,.inspect { min-width:0; border-right:1px solid var(--line); background:rgba(11,16,32,.72); backdrop-filter:blur(12px); }
+    aside { padding:18px; overflow:auto; } main { display:flex; flex-direction:column; } .inspect { border:0; padding:18px; overflow:auto; }
+    h1 { margin:0 0 2px; font-size:20px; } h2 { margin:20px 0 8px; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+    .hint,.meta { color:var(--muted); font-size:12px; } .stack { display:grid; gap:8px; }
+    .session { width:100%; margin:5px 0; padding:10px; text-align:left; } .session.active { border-color:var(--accent); background:#17352f; }
+    .session b,.session small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .session small { color:var(--muted); }
+    .thread-entry { margin:7px 0; padding:9px; border:1px solid var(--line); border-radius:9px; background:#10192b; }
+    .thread-entry b,.thread-entry small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .thread-entry small { color:var(--muted); }
+    .thread-actions { display:flex; gap:6px; margin-top:7px; } .thread-actions button { flex:1; padding:5px 7px; font-size:11px; }
+    .check { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:12px; } .check input { width:auto; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--line); }
+    #chat { flex:1; overflow:auto; padding:24px; } .empty { max-width:580px; margin:15vh auto; text-align:center; color:var(--muted); }
+    .message { max-width:82%; margin:0 0 16px; padding:12px 14px; border:1px solid var(--line); border-radius:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .message.user { margin-left:auto; background:#17352f; } .message.assistant { background:#131d32; } .message.error { color:var(--danger); }
+    .role { margin-bottom:5px; color:var(--muted); font-size:11px; text-transform:uppercase; }
+    .tool-card { max-width:92%; margin:0 0 16px; border:1px solid var(--line); border-radius:11px; background:#10192b; overflow:hidden; }
+    .tool-card summary { display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; list-style:none; }
+    .tool-card summary::-webkit-details-marker { display:none; } .tool-card summary::before { content:'›'; color:var(--muted); transition:transform .15s; } .tool-card[open] summary::before { transform:rotate(90deg); }
+    .tool-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .tool-state { color:#f1c66f; font-size:11px; } .tool-state.done { color:var(--accent); } .tool-state.failed { color:var(--danger); }
+    .tool-body { padding:0 12px 12px; } .tool-meta { margin-bottom:7px; color:var(--muted); font-size:11px; overflow-wrap:anywhere; }
+    .terminal { max-height:320px; margin:0; padding:11px; border:1px solid #1d2940; border-radius:7px; color:#d7e4ff; background:#070b13; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .approval { padding:12px; border-color:#7a6433; background:#292313; } .approval-title { margin-bottom:5px; color:#f1c66f; font-weight:700; } .approval-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; } .approval-actions button { padding:6px 9px; } .approval-actions button.reject { color:var(--danger); }
+    .composer { display:grid; grid-template-columns:1fr auto; gap:10px; padding:16px 20px; border-top:1px solid var(--line); } textarea { resize:none; min-height:76px; }
+    .turn-options { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:7px; } .turn-options select { padding:6px 8px; font-size:12px; }
+    .tabs { display:flex; gap:6px; position:sticky; top:0; padding-bottom:10px; background:var(--bg); } .tabs button.active { border-color:var(--accent); }
+    .event { margin:0 0 8px; padding:9px; border:1px solid var(--line); border-radius:8px; background:var(--panel); overflow-wrap:anywhere; }
+    .event code { display:block; max-height:180px; overflow:auto; margin-top:5px; padding:6px; color:#bed0f7; background:var(--code); white-space:pre-wrap; }
+    .badge { display:inline-block; margin-right:6px; padding:1px 6px; border-radius:10px; color:var(--accent); background:#18372f; font-size:11px; }
+    .status { width:8px; height:8px; display:inline-block; margin-right:6px; border-radius:50%; background:#68738a; } .status.live { background:var(--accent); box-shadow:0 0 10px var(--accent); }
+    @media (max-width:1000px) { .app { grid-template-columns:230px 1fr; } .inspect { display:none; } }
+    @media (max-width:680px) { .app { display:block; height:auto; } aside { max-height:320px; border-bottom:1px solid var(--line); } main { min-height:calc(100vh - 280px); } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Codex · Solon</h1>
+    <div class="hint">Java 25 / SSE / 多会话</div>
+    <h2>新建或恢复</h2>
+    <form id="create-form" class="stack">
+      <input id="name" placeholder="会话名称">
+      <input id="workspace" placeholder="工作目录（留空使用根目录）">
+      <input id="thread-id" placeholder="已有 Thread ID（可选）">
+      <select id="personality">
+        <option value="pragmatic">Personality：pragmatic</option>
+        <option value="friendly">Personality：friendly</option>
+        <option value="none">Personality：none</option>
+      </select>
+      <input id="service-tier" placeholder="Service Tier（可选，如 priority）">
+      <button class="primary" type="submit">创建会话</button>
+    </form>
+    <div id="root" class="hint" style="margin-top:8px"></div>
+    <h2>会话</h2>
+    <div id="sessions"></div>
+    <h2>Codex 历史</h2>
+    <form id="thread-filter" class="stack">
+      <input id="thread-search" placeholder="搜索 Thread">
+      <label class="check"><input id="show-archived" type="checkbox">查看已归档</label>
+      <button type="submit">刷新历史</button>
+    </form>
+    <div id="threads"></div>
+  </aside>
+
+  <main>
+    <header>
+      <div><span id="connection" class="status"></span><b id="title">请选择会话</b><div id="subtitle" class="meta"></div></div>
+      <div><button id="interrupt" class="danger">打断</button> <button id="close">关闭会话</button></div>
+    </header>
+    <div id="chat"><div class="empty"><h1>完整流式对话示例</h1><p>创建会话后发送任务；切换会话不会停止后台 Turn。</p></div></div>
+    <form id="message-form" class="composer">
+      <div>
+        <textarea id="message" placeholder="例如：检查当前目录，运行测试并修复失败。Enter 发送，Shift+Enter 换行。"></textarea>
+        <div class="turn-options">
+          <select id="reasoning-effort">
+            <option value="">Reasoning Effort：默认</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+            <option value="xhigh">xhigh</option>
+          </select>
+          <select id="reasoning-summary">
+            <option value="auto">Reasoning Summary：auto</option>
+            <option value="concise">concise</option>
+            <option value="detailed">detailed</option>
+            <option value="none">none</option>
+          </select>
+        </div>
+      </div>
+      <button class="primary" type="submit">发送</button>
+    </form>
+  </main>
+
+  <section class="inspect">
+    <div class="tabs"><button data-tab="tools" class="active">工具</button><button data-tab="files">目录</button><button data-tab="raw">事件</button></div>
+    <div id="inspector"></div>
+  </section>
+</div>
+<script>
+  const state = { sessions:new Map(), events:new Map(), sequences:new Map(), history:new Map(), threadPage:null, current:null, source:null, switchVersion:0, tab:'tools' };
+  const $ = id => document.getElementById(id);
+
+  async function api(path, options={}) {
+    const response = await fetch('/api/codex' + path, {headers:{'Content-Type':'application/json'}, ...options});
+    if (!response.ok) {
+      const body = await response.text();
+      let detail = body;
+      try { detail = JSON.parse(body); } catch { /* The server may return a plain-text error page. */ }
+      const message = detail?.message || detail?.error || body || `HTTP ${response.status}`;
+      const metadata = detail?.type ? ` [${detail.type}${detail.code == null ? '' : `/${detail.code}`}${detail.retryable ? '，可重试' : ''}]` : '';
+      throw new Error(message + metadata);
+    }
+    return response.status === 204 ? null : response.json();
+  }
+
+  async function refreshSessions() {
+    const sessions = await api('/sessions');
+    sessions.forEach(session => state.sessions.set(session.id, session));
+    for (const id of [...state.sessions.keys()]) if (!sessions.some(item => item.id === id)) state.sessions.delete(id);
+    renderSessions(); renderHeader();
+  }
+
+  async function refreshThreads(cursor='') {
+    const query = new URLSearchParams({
+      archived:String($('show-archived').checked),
+      limit:'20'
+    });
+    if ($('thread-search').value.trim()) query.set('searchTerm', $('thread-search').value.trim());
+    if (cursor) query.set('cursor', cursor);
+    state.threadPage = await api('/threads?' + query);
+    renderThreads();
+  }
+
+  function renderSessions() {
+    $('sessions').innerHTML = [...state.sessions.values()].map(session => `
+      <button class="session ${session.id === state.current ? 'active' : ''}" data-session="${escapeHtml(session.id)}">
+        <b>${escapeHtml(session.name)} ${session.running ? ' · 执行中' : ''}</b>
+        <small>${escapeHtml(session.threadId)}</small><small>${escapeHtml(session.workspace)}</small>
+      </button>`).join('') || '<div class="hint">还没有会话</div>';
+    document.querySelectorAll('[data-session]').forEach(button => button.onclick = () => switchSession(button.dataset.session));
+  }
+
+  function renderThreads() {
+    const archived = $('show-archived').checked;
+    const page = state.threadPage || {data:[]};
+    $('threads').innerHTML = (page.data || []).map(thread => `
+      <div class="thread-entry">
+        <b>${escapeHtml(thread.name || thread.preview || '未命名 Thread')}</b>
+        <small>${escapeHtml(thread.id)} · ${escapeHtml(thread.status?.type || 'unknown')}</small>
+        <small>${escapeHtml(thread.cwd || '')}</small>
+        <div class="thread-actions">
+          ${archived
+            ? `<button data-thread-action="unarchive" data-thread-id="${escapeHtml(thread.id)}">取消归档</button>`
+            : `<button data-thread-action="resume" data-thread-id="${escapeHtml(thread.id)}">恢复</button><button class="danger" data-thread-action="archive" data-thread-id="${escapeHtml(thread.id)}">归档</button>`}
+        </div>
+      </div>`).join('') || '<div class="hint">没有匹配的 Thread</div>';
+    if (page.nextCursor) {
+      $('threads').insertAdjacentHTML('beforeend', `<button id="threads-next" style="width:100%;margin-top:6px">下一页</button>`);
+      $('threads-next').onclick = () => refreshThreads(page.nextCursor).catch(error => alert(error.message));
+    }
+    document.querySelectorAll('[data-thread-action]').forEach(button => button.onclick = () => threadAction(button));
+  }
+
+  async function threadAction(button) {
+    const threadId = button.dataset.threadId;
+    const thread = (state.threadPage?.data || []).find(item => item.id === threadId);
+    try {
+      if (button.dataset.threadAction === 'resume') {
+        const session = await api('/sessions', {method:'POST', body:JSON.stringify({
+          name:thread?.name || thread?.preview || '恢复会话',
+          workspace:thread?.cwd || '',
+          threadId,
+          personality:$('personality').value,
+          serviceTier:$('service-tier').value
+        })});
+        state.sessions.set(session.id, session);
+        renderSessions();
+        await switchSession(session.id);
+        return;
+      }
+      const method = button.dataset.threadAction;
+      if (method === 'archive' && !confirm(`归档 Thread ${threadId}？`)) return;
+      await api(`/threads/${method}`, {method:'POST', body:JSON.stringify({threadId})});
+      const attached = [...state.sessions.values()].find(session => session.threadId === threadId);
+      if (attached) {
+        state.sessions.delete(attached.id);
+        state.history.delete(attached.id);
+        if (state.current === attached.id) {
+          state.source?.close();
+          state.current = null;
+        }
+      }
+      await Promise.all([refreshSessions(), refreshThreads()]);
+      renderAll();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function switchSession(id) {
+    const version = ++state.switchVersion;
+    state.current = id;
+    if (!state.events.has(id)) state.events.set(id, []);
+    if (!state.sequences.has(id)) state.sequences.set(id, new Set());
+    state.source?.close();
+    state.source = null;
+    $('connection').classList.remove('live');
+    $('chat').innerHTML = '<div class="empty">正在读取 Codex Thread 历史…</div>';
+    renderSessions(); renderHeader();
+    try {
+      state.history.set(id, await api('/history?sessionId=' + encodeURIComponent(id)));
+    } catch (error) {
+      state.history.set(id, {turns:[], error:error.message});
+    }
+    if (version !== state.switchVersion || id !== state.current) return;
+    const source = new EventSource('/api/codex/events?sessionId=' + encodeURIComponent(id));
+    state.source = source;
+    source.onopen = () => $('connection').classList.add('live');
+    source.onerror = () => $('connection').classList.remove('live');
+    source.onmessage = event => receive(JSON.parse(event.data));
+    renderAll();
+  }
+
+  function receive(event) {
+    const seen = state.sequences.get(event.sessionId) || new Set();
+    if (seen.has(event.sequence)) return;
+    seen.add(event.sequence); state.sequences.set(event.sessionId, seen);
+    if (event.type !== 'heartbeat') {
+      const events = state.events.get(event.sessionId) || [];
+      events.push(event); state.events.set(event.sessionId, events.slice(-500));
+    }
+    if (event.type === 'turn.accepted') patchSession(event.sessionId, {running:true, activeTurnId:event.data.turnId});
+    if (event.type === 'turn.completed' || event.type === 'turn.error') patchSession(event.sessionId, {running:false, activeTurnId:null});
+    if (event.sessionId === state.current) renderAll();
+  }
+
+  function patchSession(id, patch) {
+    const session = state.sessions.get(id); if (session) state.sessions.set(id, {...session, ...patch});
+    renderSessions(); renderHeader();
+  }
+
+  function renderAll() { renderHeader(); renderChat(); renderInspector(); }
+  function renderHeader() {
+    const session = state.sessions.get(state.current);
+    $('title').textContent = session?.name || '请选择会话';
+    $('subtitle').textContent = session ? `${session.workspace} · ${session.threadId}` : '';
+    $('interrupt').disabled = !session?.running; $('close').disabled = !session;
+  }
+
+  function renderChat() {
+    if (!state.current) {
+      $('chat').innerHTML = '<div class="empty"><h1>完整流式对话示例</h1><p>创建或恢复会话后发送任务。</p></div>';
+      return;
+    }
+    const history = state.history.get(state.current) || {turns:[]};
+    const completedTurnIds = new Set(
+      history.turns.filter(turn => turn.status !== 'inProgress').map(turn => turn.id)
+    );
+    const entries = historyEntries(history);
+    for (const event of state.events.get(state.current) || []) {
+      if (event.data?.turnId && completedTurnIds.has(event.data.turnId)) continue;
+      if (event.type === 'user.message') entries.push({entry:'message', role:'user', text:event.data.text});
+      if (event.type === 'assistant.delta') {
+        let last = entries.at(-1);
+        if (!last || last.entry !== 'message' || last.role !== 'assistant') { last={entry:'message', role:'assistant', text:''}; entries.push(last); }
+        last.text += event.data.delta || '';
+      }
+      if (event.type === 'assistant.final') {
+        let last = entries.at(-1);
+        if (!last || last.entry !== 'message' || last.role !== 'assistant') { last={entry:'message', role:'assistant', text:''}; entries.push(last); }
+        last.text = event.data.text || last.text;
+      }
+      if (event.type === 'turn.error') entries.push({entry:'message', role:'error', text:event.data.message || 'Turn 执行失败'});
+      if (/^tool\.[^.]+\.started$/.test(event.type)) {
+        entries.push({entry:'tool', kind:event.type.split('.')[1], itemId:event.data.itemId, data:event.data, output:'', status:'running'});
+      }
+      if (/^tool\.[^.]+\.output$/.test(event.type)) {
+        let tool = [...entries].reverse().find(item => item.entry === 'tool' && item.itemId === event.data.itemId);
+        if (!tool) { tool={entry:'tool', kind:event.type.split('.')[1], itemId:event.data.itemId, data:event.data, output:'', status:'running'}; entries.push(tool); }
+        const combined = tool.output + (event.data.delta || '');
+        tool.output = combined.length > 100000 ? '…[较早输出已省略]\n' + combined.slice(-100000) : combined;
+      }
+      if (/^tool\.[^.]+\.completed$/.test(event.type)) {
+        let tool = [...entries].reverse().find(item => item.entry === 'tool' && item.itemId === event.data.itemId);
+        if (!tool) { tool={entry:'tool', kind:event.type.split('.')[1], itemId:event.data.itemId, output:'', data:event.data}; entries.push(tool); }
+        tool.data = {...tool.data, ...event.data}; tool.status = event.data.successful === false ? 'failed' : 'done';
+      }
+      if (event.type === 'approval.requested') entries.push({entry:'approval', ...event.data, status:'pending'});
+      if (event.type === 'approval.resolved') {
+        const approval = [...entries].reverse().find(item => item.entry === 'approval' && item.approvalId === event.data.approvalId);
+        if (approval) { approval.status='resolved'; approval.decision=event.data.decision; }
+      }
+    }
+    if (history.error) entries.unshift({entry:'message', role:'error', text:'历史读取失败：' + history.error});
+    $('chat').innerHTML = entries.map(renderChatEntry).join('') || '<div class="empty">这个会话还没有消息。</div>';
+    document.querySelectorAll('[data-approval-decision]').forEach(button => button.onclick = () => decideApproval(button));
+    $('chat').scrollTop = $('chat').scrollHeight;
+  }
+
+  function historyEntries(history) {
+    const entries = [];
+    for (const turn of history.turns || []) {
+      if (turn.status === 'inProgress') continue;
+      for (const item of turn.items || []) {
+        if (item.type === 'userMessage') entries.push({entry:'message', role:'user', text:item.text || '', historical:true});
+        if (item.type === 'agentMessage') entries.push({entry:'message', role:'assistant', text:item.text || '', historical:true});
+        if (['commandExecution','fileChange','mcpToolCall','webSearch'].includes(item.type)) {
+          const kind = ({commandExecution:'command', fileChange:'fileChange', mcpToolCall:'mcp', webSearch:'webSearch'})[item.type];
+          entries.push({
+            entry:'tool',
+            kind,
+            itemId:item.id,
+            status:['failed','declined'].includes(item.status) ? 'failed' : 'done',
+            output:item.output || '',
+            historical:true,
+            data:{
+              command:item.command,
+              toolName:item.text || item.type,
+              workingDirectory:item.workingDirectory,
+              status:item.status
+            }
+          });
+        }
+      }
+      if (turn.error) entries.push({entry:'message', role:'error', text:turn.error, historical:true});
+    }
+    return entries;
+  }
+
+  function renderChatEntry(item) {
+    if (item.entry === 'message') return `<div class="message ${item.role}"><div class="role">${item.role}${item.historical ? ' · 历史' : ''}</div>${escapeHtml(item.text)}</div>`;
+    if (item.entry === 'approval') {
+      const command = item.command || item.toolName || item.kind || '工具调用';
+      const resolved = item.status === 'resolved';
+      return `<div class="tool-card approval"><div class="approval-title">需要你的批准 · ${escapeHtml(toolLabel(item.kind, command))}</div>
+        <div class="tool-meta">${escapeHtml(item.reason || 'Codex 请求执行此操作')}${item.workingDirectory ? ' · ' + escapeHtml(item.workingDirectory) : ''}</div>
+        <pre class="terminal">${escapeHtml(stripAnsi(command))}</pre>
+        ${resolved ? `<div class="tool-meta">已处理：${escapeHtml(decisionLabel(item.decision))}</div>` : `<div class="approval-actions">
+          <button class="primary" data-approval-id="${escapeHtml(item.approvalId)}" data-approval-decision="accept">允许一次</button>
+          <button data-approval-id="${escapeHtml(item.approvalId)}" data-approval-decision="acceptForSession">本会话允许</button>
+          <button class="reject" data-approval-id="${escapeHtml(item.approvalId)}" data-approval-decision="decline">拒绝</button>
+          <button data-approval-id="${escapeHtml(item.approvalId)}" data-approval-decision="cancel">取消 Turn</button>
+        </div>`}</div>`;
+    }
+    const command = item.data.command || item.data.toolName || item.kind;
+    const stateClass = item.status === 'done' ? 'done' : item.status === 'failed' ? 'failed' : '';
+    const stateText = item.status === 'done' ? (item.historical ? '历史 · 完成' : '完成') : item.status === 'failed' ? (item.historical ? '历史 · 失败' : '失败') : '执行中';
+    const terminal = item.output || (item.kind === 'command' ? command : JSON.stringify(item.data, null, 2));
+    return `<details class="tool-card" open><summary><span class="badge">${escapeHtml(item.kind)}</span><span class="tool-title">${escapeHtml(toolLabel(item.kind, command))}</span><span class="tool-state ${stateClass}">${stateText}</span></summary>
+      <div class="tool-body"><div class="tool-meta">itemId: ${escapeHtml(item.itemId || '未知')}${item.data.workingDirectory ? ' · ' + escapeHtml(item.data.workingDirectory) : ''}</div><pre class="terminal">${escapeHtml(stripAnsi(terminal || '等待输出…'))}</pre></div></details>`;
+  }
+
+  async function decideApproval(button) {
+    const buttons = button.closest('.approval-actions')?.querySelectorAll('button') || [];
+    buttons.forEach(item => item.disabled=true);
+    try {
+      await api('/approvals', {method:'POST', body:JSON.stringify({sessionId:state.current, approvalId:button.dataset.approvalId, decision:button.dataset.approvalDecision})});
+    } catch (error) {
+      buttons.forEach(item => item.disabled=false); alert(error.message);
+    }
+  }
+
+  function toolLabel(kind, command) {
+    if (kind === 'command') {
+      const value=String(command || '').toLowerCase();
+      const shell=value.includes('powershell') || value.includes('pwsh') ? 'PowerShell' : /(^|[\\/\s])cmd(\.exe)?([\s/]|$)/.test(value) ? 'CMD' : /(^|[\\/\s])(bash|zsh|sh)([\s/]|$)/.test(value) ? 'Bash' : '命令';
+      return `${shell} · ${command || '等待命令'}`;
+    }
+    return `${kind || 'tool'} · ${command || '工具调用'}`;
+  }
+
+  function decisionLabel(value) { return ({accept:'允许一次', acceptForSession:'本会话允许', decline:'已拒绝', cancel:'已取消'})[value] || value || '已处理'; }
+  function stripAnsi(value) { return String(value ?? '').replace(/[\u001b\u009b][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d\/#&.:=?%@~_]+)*)?\u0007)|(?:(?:\d{1,4}(?:[;:]\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g, ''); }
+
+  function renderInspector() {
+    const events = (state.events.get(state.current) || []).filter(event => {
+      if (state.tab === 'tools') return event.type.startsWith('tool.') || event.type.startsWith('approval.') || event.type.startsWith('usage.');
+      if (state.tab === 'files') return event.type === 'workspace.changed';
+      return true;
+    }).slice(-100).reverse();
+    $('inspector').innerHTML = events.map(event => `<div class="event"><span class="badge">${escapeHtml(event.type)}</span><span class="meta">#${event.sequence} ${escapeHtml(event.time)}</span><code>${escapeHtml(JSON.stringify(event.data, null, 2))}</code></div>`).join('') || '<div class="hint">暂无事件</div>';
+  }
+
+  $('create-form').onsubmit = async event => {
+    event.preventDefault();
+    try {
+      const session = await api('/sessions', {method:'POST', body:JSON.stringify({
+        name:$('name').value,
+        workspace:$('workspace').value,
+        threadId:$('thread-id').value,
+        personality:$('personality').value,
+        serviceTier:$('service-tier').value
+      })});
+      state.sessions.set(session.id, session); renderSessions(); await switchSession(session.id); await refreshThreads();
+    } catch (error) { alert(error.message); }
+  };
+  $('message-form').onsubmit = async event => {
+    event.preventDefault(); const message=$('message').value.trim();
+    if (!state.current || !message) return;
+    $('message').value='';
+    try { await api('/messages', {method:'POST', body:JSON.stringify({
+      sessionId:state.current,
+      message,
+      reasoningEffort:$('reasoning-effort').value,
+      reasoningSummary:$('reasoning-summary').value
+    })}); await refreshSessions(); }
+    catch (error) { alert(error.message); $('message').value=message; }
+  };
+  $('message').onkeydown = event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('message-form').requestSubmit(); } };
+  $('interrupt').onclick = async () => { try { await api('/interrupt', {method:'POST', body:JSON.stringify({sessionId:state.current})}); } catch (error) { alert(error.message); } };
+  $('close').onclick = async () => {
+    if (!state.current || !confirm('关闭这个网页会话并中断其活动 Turn？')) return;
+    const id=state.current; try { await api('/sessions?sessionId='+encodeURIComponent(id), {method:'DELETE'}); state.source?.close(); state.current=null; state.sessions.delete(id); state.history.delete(id); renderAll(); renderSessions(); } catch (error) { alert(error.message); }
+  };
+  $('thread-filter').onsubmit = event => { event.preventDefault(); refreshThreads().catch(error => alert(error.message)); };
+  $('show-archived').onchange = () => refreshThreads().catch(error => alert(error.message));
+  document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => { state.tab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item => item.classList.toggle('active', item===button)); renderInspector(); });
+  function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
+
+  (async () => { try { const info=await api('/info'); $('root').textContent=`模型：${info.model} · 允许根目录：${info.workspaceRoot}`; await Promise.all([refreshSessions(), refreshThreads()]); } catch (error) { $('root').textContent=error.message; } })();
+</script>
+</body>
+</html>

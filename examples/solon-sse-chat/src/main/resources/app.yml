@@ -1,0 +1,9 @@
+server.port: 8080
+server.request.encoding: utf-8
+server.response.encoding: utf-8
+
+solon.app:
+  name: codex-solon-sse-chat
+
+# Solon 的请求处理使用 JDK 25 虚拟线程。
+solon.threads.virtual.enabled: true
