@@ -1,39 +1,47 @@
-# Unofficial Codex Java SDK
+# 非官方 Codex Java SDK
 
-Java 25 SDK for embedding the Codex agent in JVM applications. It launches
-`codex app-server`, performs the JSON-RPC v2 handshake, and exchanges JSONL
-messages over standard input and output.
+这是一个面向 Java 25 的 Codex SDK，用于在 JVM 应用中嵌入 Codex Agent。SDK 会启动
+`codex app-server`，完成 JSON-RPC v2 握手，并通过标准输入输出交换 JSONL 消息。
 
 > [!IMPORTANT]
-> This is an unofficial, community-maintained SDK. It is not affiliated with,
-> endorsed by, or maintained by OpenAI.
+> 这是一个由社区维护的非官方 SDK，与 OpenAI 没有隶属关系，也未获得 OpenAI 的认可或维护。
 
-Detailed Chinese documentation: [中文教程](docs/README.md).
+完整使用教程：[中文教程](docs/README.md)。
 
-Complete Solon Web SSE example: [多会话流式对话案例](examples/solon-sse-chat/README.md).
+Solon Web SSE 完整示例：[多会话流式对话案例](examples/solon-sse-chat/README.md)。
 
-## Requirements
+## 环境要求
 
 - JDK 25
 - Maven 3.9+
-- A `codex` executable on `PATH`, or an explicit executable path
+- `PATH` 中存在 `codex` 可执行文件，或者显式指定 Codex 可执行文件路径
 
-## Build
+## Maven 坐标
+
+```xml
+<dependency>
+  <groupId>io.github.majiajustar</groupId>
+  <artifactId>codex-java-sdk</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+当前版本尚未发布到 Maven Central，可先在 SDK 根目录执行 `mvn install` 安装到本地 Maven 仓库。
+
+## 构建
 
 ```shell
-cd sdk/java
 mvn test
 ```
 
-The SDK checks in Java records and enums generated from the repository's
-app-server v2 schemas:
+SDK 提交了从 app-server v2 Schema 生成的 Java record 和 enum。生成或检查协议类型：
 
 ```shell
 mvn -Pgenerate-protocol generate-sources
 mvn -Pcheck-protocol validate
 ```
 
-## Quick start
+## 快速开始
 
 ```java
 import io.github.majiajustar.codex.CodexClient;
@@ -48,30 +56,29 @@ try (CodexClient codex = CodexClient.create()) {
             .sandbox(ThreadOptions.Sandbox.WORKSPACE_WRITE)
             .build());
 
-    TurnResult result = thread.run("Explain this repository in three bullets.");
+    TurnResult result = thread.run("请用三个要点解释这个仓库。");
     System.out.println(result.finalResponse());
 }
 ```
 
-## Package layout
+## 包结构
 
-The small root package contains client and runtime handles. Domain APIs are
-grouped by responsibility:
+根包只保留客户端、配置和运行时句柄，其他 API 按领域划分：
 
 ```text
-io.github.majiajustar.codex            client, configuration, thread/turn handles
-io.github.majiajustar.codex.thread     thread options and list options
-io.github.majiajustar.codex.turn       turn options, inputs, results, and usage
-io.github.majiajustar.codex.event      events, notifications, and items
-io.github.majiajustar.codex.model      model catalog types
-io.github.majiajustar.codex.tool       approvals, interceptors, and tool lifecycle
-io.github.majiajustar.codex.sandbox    sandbox policies
-io.github.majiajustar.codex.exception  SDK and JSON-RPC exceptions
-io.github.majiajustar.codex.generated  generated app-server protocol types
-io.github.majiajustar.codex.internal   implementation details; not public API
+io.github.majiajustar.codex            客户端、配置、Thread/Turn 运行时句柄
+io.github.majiajustar.codex.thread     Thread 配置和列表选项
+io.github.majiajustar.codex.turn       Turn 配置、输入、结果和 Usage
+io.github.majiajustar.codex.event      事件、通知和 Item
+io.github.majiajustar.codex.model      模型目录类型
+io.github.majiajustar.codex.tool       审批、拦截器和工具生命周期
+io.github.majiajustar.codex.sandbox    沙箱策略
+io.github.majiajustar.codex.exception  SDK 和 JSON-RPC 异常
+io.github.majiajustar.codex.generated  自动生成的 app-server 协议类型
+io.github.majiajustar.codex.internal   内部实现，不属于公共 API
 ```
 
-Use a specific Codex binary when it is not on `PATH`:
+当 `codex` 不在 `PATH` 中时，可以指定可执行文件：
 
 ```java
 CodexClientConfig config = CodexClientConfig.builder()
@@ -83,8 +90,9 @@ try (CodexClient codex = CodexClient.create(config)) {
 }
 ```
 
-For an internal OpenAI-compatible endpoint, configure the endpoint, API key,
-and optional raw Codex configuration overrides directly on the client:
+## 内网 API Key 配置
+
+使用内部 OpenAI-compatible 接口时，可以直接配置地址、API Key、模型和 Codex 配置项：
 
 ```java
 CodexClientConfig config = CodexClientConfig.builder()
@@ -99,17 +107,16 @@ CodexClientConfig config = CodexClientConfig.builder()
         .build();
 ```
 
-`apiKey(...)` passes the credential as `OPENAI_API_KEY` only to the app-server
-child process. It is not placed on the command line.
-Named settings take precedence over matching raw `configOverride(...)` entries.
+`apiKey(...)` 只会通过 `OPENAI_API_KEY` 环境变量传递给 app-server 子进程，不会出现在命令行中。
+具名配置会覆盖相同的原始 `configOverride(...)` 配置项。
 
-## Streaming
+## 流式事件
 
-Turn events implement the JDK `Flow` API. Subscribe before awaiting the result;
-events that arrived before `turn/start` returned are retained for the subscriber.
+Turn 事件使用 JDK `Flow` API。建议在等待结果前完成订阅；在 `turn/start` 返回前已经收到的事件，
+也会为订阅者保留并重放。
 
 ```java
-CodexTurn turn = thread.startTurn("Run the tests and explain any failures.");
+CodexTurn turn = thread.startTurn("运行测试并解释所有失败。");
 turn.events().subscribe(new Flow.Subscriber<>() {
     public void onSubscribe(Flow.Subscription subscription) {
         subscription.request(Long.MAX_VALUE);
@@ -124,8 +131,7 @@ turn.events().subscribe(new Flow.Subscriber<>() {
 TurnResult result = turn.await();
 ```
 
-Known notifications and completed items have sealed, strongly typed views. Raw
-JSON remains available for forward compatibility:
+已知通知和已完成 Item 提供 sealed 强类型视图，同时保留原始 JSON 以支持协议向前兼容：
 
 ```java
 CodexNotification notification = event.notification();
@@ -140,22 +146,23 @@ List<CodexItem> items = result.typedItems();
 CodexModelList models = codex.listModels();
 ```
 
-Unrecognized notification methods and future item variants become
-`CodexNotification.Unknown` and `CodexItem.Unknown` instead of failing
-deserialization. The original payload is available through `raw()`.
+无法识别的通知方法和未来新增的 Item 类型会转换为 `CodexNotification.Unknown` 和
+`CodexItem.Unknown`，而不是导致反序列化失败。原始载荷可以通过 `raw()` 获取。
 
-`CodexTurn` also supports `steer(...)`, `interrupt()`, and `resultAsync()`.
-Use `CancellationToken` for AbortSignal-style cooperative cancellation:
+## 取消、追加指令与多目录
+
+`CodexTurn` 支持 `steer(...)`、`interrupt()` 和 `resultAsync()`。可以使用
+`CancellationToken` 实现类似 AbortSignal 的协作式取消：
 
 ```java
 CancellationToken cancellation = new CancellationToken();
-CodexTurn turn = thread.startTurn("Run the test suite", cancellation);
+CodexTurn turn = thread.startTurn("运行测试套件", cancellation);
 
-// From another request, timeout, or UI callback:
+// 在另一个请求、超时处理器或 UI 回调中调用：
 cancellation.cancel();
 ```
 
-Additional project roots use the app-server v2 runtime-workspace-roots field:
+通过 app-server v2 的 runtime-workspace-roots 字段添加额外项目目录：
 
 ```java
 ThreadOptions options = ThreadOptions.builder()
@@ -165,23 +172,22 @@ ThreadOptions options = ThreadOptions.builder()
         .build();
 ```
 
-Additional directories must be absolute. `skipGitRepoCheck` is accepted for
-configuration parity; app-server does not run the `codex exec` Git preflight,
-so no wire field is necessary.
+额外目录必须使用绝对路径。`skipGitRepoCheck` 用于与其他 SDK 的配置能力保持一致；app-server
+不会执行 `codex exec` 的 Git 预检查，因此不需要传输对应的协议字段。
 
-`CodexClient.request(...)` exposes raw JSON-RPC methods for app-server APIs that
-do not yet have a convenience wrapper.
+`CodexClient.request(...)` 提供原始 JSON-RPC 调用入口，可以访问尚未提供便捷封装的
+app-server API。
 
-Thread listing is cursor-paginated and strongly typed through
-`ThreadListOptions`/`ThreadListResponse`; archive and unarchive have dedicated
-client and thread methods. Server overload responses are retried automatically
-with configurable exponential backoff, while non-retryable JSON-RPC errors are
-mapped to specific exception classes.
+Thread 列表通过 `ThreadListOptions` 和 `ThreadListResponse` 提供强类型游标分页；归档和取消归档
+同时提供客户端和 Thread 方法。服务过载响应会按照可配置的指数退避策略自动重试，其他不可重试的
+JSON-RPC 错误则会映射为对应的异常类型。
 
-## Approval handling
+## 审批处理
 
-The default approval handler accepts command execution and file-change requests.
-Production applications should explicitly configure `approvalHandler(...)` and
-can register typed `ToolInterceptor` and `ToolObserver` extensions. The original
-`serverRequestHandler(...)` remains available for raw and forward-compatible
-server requests.
+默认审批处理器会接受命令执行和文件修改请求。生产应用应显式配置 `approvalHandler(...)`，
+也可以注册强类型的 `ToolInterceptor` 和 `ToolObserver` 扩展。原始的
+`serverRequestHandler(...)` 仍可用于处理自定义或未来新增的服务端请求。
+
+## 许可证
+
+本项目使用 [Apache License 2.0](LICENSE)。
