@@ -2,7 +2,7 @@
 
 [上一章](14-solon-sse-complete-example.md) · [返回目录](README.md)
 
-Java SDK 的 v2 协议模型不手工复制字段，而是从当前仓库的 app-server JSON Schema
+Java SDK 的 v2 协议模型不手工复制字段，而是从 Codex `v0.153.0` 的 app-server JSON Schema
 确定性生成。生成结果提交到源码仓库，因此 SDK 用户只需要 Maven 和 JDK 25，运行时
 不依赖 Python。
 
@@ -23,7 +23,7 @@ codex-rs/app-server-protocol/schema/json/v2/*.json
 生成代码：
 
 ```text
-sdk/java/src/main/java/com/openai/codex/generated/v2/
+sdk/java/src/main/java/io/github/majiajustar/codex/generated/v2/
 ```
 
 这里的文件包含清晰的生成标记，请不要直接修改。稳定字符串集合生成 Java `enum`，
@@ -64,8 +64,8 @@ mvn -Pcheck-protocol validate
 
 公开便捷 API 当前生成：
 
-- `ThreadListParams`、`ThreadListResponse`、`Thread`、`ThreadStatus`；
-- `Turn`、`TurnError`、`GitInfo`；
+- `ThreadListParams`、`ThreadListResponse`、`Thread`、`ThreadStatus`、`ThreadHistoryMode`；
+- `Turn`、`TurnError`、`GitInfo`、目标偏离错误详情；
 - Thread 归档和取消归档的参数/响应；
 - 列表排序、来源、状态、Personality、审批 Reviewer、Reasoning Summary 等枚举；
 - `SchemaMetadata.SHA256`，记录生成时聚合 v2 Schema 的摘要。
@@ -102,6 +102,13 @@ mvn test
 
 ```shell
 CODEX_REPO_ROOT=/path/to/codex mvn -Pcheck-protocol validate
+```
+
+PowerShell 示例：
+
+```powershell
+$env:CODEX_REPO_ROOT = "D:\code\codex-code\codex-source\codex-rust-v0.153.0"
+mvn -Pcheck-protocol validate
 ```
 
 手写的客户端与运行时句柄放在 `io.github.majiajustar.codex`，Thread、Turn、事件、工具等

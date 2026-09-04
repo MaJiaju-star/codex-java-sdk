@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.majiajustar.codex.event.CodexEvent;
+import io.github.majiajustar.codex.config.ConfigClient;
 import io.github.majiajustar.codex.exception.CodexException;
 import io.github.majiajustar.codex.exception.CodexTimeoutException;
 import io.github.majiajustar.codex.exception.CodexTransportException;
@@ -23,6 +24,8 @@ import io.github.majiajustar.codex.generated.v2.ThreadUnarchiveResponse;
 import io.github.majiajustar.codex.internal.JsonSupport;
 import io.github.majiajustar.codex.internal.ToolLifecycleDispatcher;
 import io.github.majiajustar.codex.model.CodexModelList;
+import io.github.majiajustar.codex.mcp.McpClient;
+import io.github.majiajustar.codex.skills.SkillsClient;
 import io.github.majiajustar.codex.thread.ThreadListOptions;
 import io.github.majiajustar.codex.thread.ThreadOptions;
 import io.github.majiajustar.codex.turn.TurnOptions;
@@ -72,10 +75,16 @@ public final class CodexClient implements AutoCloseable {
     private Process process;
     private BufferedWriter writer;
     private JsonNode metadata;
+    private final McpClient mcp;
+    private final SkillsClient skills;
+    private final ConfigClient configApi;
 
     private CodexClient(CodexClientConfig config) {
         this.config = config;
         toolLifecycle = new ToolLifecycleDispatcher(config);
+        mcp = new McpClient(this);
+        skills = new SkillsClient(this);
+        configApi = new ConfigClient(this);
     }
 
     /**
@@ -120,6 +129,21 @@ public final class CodexClient implements AutoCloseable {
      */
     public java.util.concurrent.Flow.Publisher<CodexEvent> events() {
         return events;
+    }
+
+    /** 返回与当前 app-server 连接关联的 MCP 运行时客户端。 */
+    public McpClient mcp() {
+        return mcp;
+    }
+
+    /** 返回与当前 app-server 连接关联的 Skills 客户端。 */
+    public SkillsClient skills() {
+        return skills;
+    }
+
+    /** 返回分层配置读写和管理员约束 API。 */
+    public ConfigClient config() {
+        return configApi;
     }
 
     /** 使用默认选项启动一个持久化会话。 */

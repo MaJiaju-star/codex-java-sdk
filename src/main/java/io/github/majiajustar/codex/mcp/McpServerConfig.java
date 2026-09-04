@@ -18,8 +18,12 @@ public final class McpServerConfig {
     private final Duration startupTimeout;
     private final Duration toolTimeout;
     private final boolean supportsParallelToolCalls;
+    private final String environmentId;
+    private final List<McpToolExposureSurface> omitToolsFrom;
     private final List<String> enabledTools;
     private final List<String> disabledTools;
+    private final List<String> scopes;
+    private final String oauthResource;
     private final McpToolApprovalMode defaultToolsApprovalMode;
     private final Map<String, McpToolConfig> tools;
 
@@ -30,8 +34,12 @@ public final class McpServerConfig {
         startupTimeout = nonNegative(builder.startupTimeout, "startupTimeout");
         toolTimeout = nonNegative(builder.toolTimeout, "toolTimeout");
         supportsParallelToolCalls = builder.supportsParallelToolCalls;
+        environmentId = builder.environmentId;
+        omitToolsFrom = builder.omitToolsFrom == null ? null : List.copyOf(builder.omitToolsFrom);
         enabledTools = copyOptionalNames(builder.enabledTools, "enabledTools");
         disabledTools = copyOptionalNames(builder.disabledTools, "disabledTools");
+        scopes = copyOptionalNames(builder.scopes, "scopes");
+        oauthResource = builder.oauthResource;
         defaultToolsApprovalMode = builder.defaultToolsApprovalMode;
         tools = immutableMap(builder.tools);
     }
@@ -64,6 +72,12 @@ public final class McpServerConfig {
     public boolean supportsParallelToolCalls() {
         return supportsParallelToolCalls;
     }
+    public String environmentId() {
+        return environmentId;
+    }
+    public List<McpToolExposureSurface> omitToolsFrom() {
+        return omitToolsFrom;
+    }
 
     /** 返回工具白名单；未配置时返回 {@code null}，空列表表示不暴露任何工具。 */
     public List<String> enabledTools() {
@@ -72,6 +86,12 @@ public final class McpServerConfig {
     /** 返回工具黑名单；未配置时返回 {@code null}。 */
     public List<String> disabledTools() {
         return disabledTools;
+    }
+    public List<String> scopes() {
+        return scopes;
+    }
+    public String oauthResource() {
+        return oauthResource;
     }
     public McpToolApprovalMode defaultToolsApprovalMode() {
         return defaultToolsApprovalMode;
@@ -106,6 +126,7 @@ public final class McpServerConfig {
             String bearerTokenEnvVar,
             Map<String, String> httpHeaders,
             Map<String, String> envHttpHeaders,
+            String httpHeadersHelper,
             McpAuthMode auth,
             McpOAuthConfig oauth)
             implements Transport {
@@ -120,6 +141,9 @@ public final class McpServerConfig {
             }
             httpHeaders = immutableStringMap(httpHeaders, "httpHeaders");
             envHttpHeaders = immutableStringMap(envHttpHeaders, "envHttpHeaders");
+            if (httpHeadersHelper != null) {
+                httpHeadersHelper = requireText(httpHeadersHelper, "httpHeadersHelper");
+            }
         }
     }
 
@@ -130,8 +154,12 @@ public final class McpServerConfig {
         private Duration startupTimeout;
         private Duration toolTimeout;
         private boolean supportsParallelToolCalls;
+        private String environmentId;
+        private List<McpToolExposureSurface> omitToolsFrom;
         private List<String> enabledTools;
         private List<String> disabledTools;
+        private List<String> scopes;
+        private String oauthResource;
         private McpToolApprovalMode defaultToolsApprovalMode;
         private final Map<String, McpToolConfig> tools = new LinkedHashMap<>();
 
@@ -162,6 +190,16 @@ public final class McpServerConfig {
             return self();
         }
 
+        public B environmentId(String environmentId) {
+            this.environmentId = requireText(environmentId, "environmentId");
+            return self();
+        }
+
+        public B omitToolsFrom(McpToolExposureSurface... surfaces) {
+            omitToolsFrom = List.of(surfaces);
+            return self();
+        }
+
         public B enabledTools(String... enabledTools) {
             this.enabledTools = List.of(enabledTools);
             return self();
@@ -169,6 +207,16 @@ public final class McpServerConfig {
 
         public B disabledTools(String... disabledTools) {
             this.disabledTools = List.of(disabledTools);
+            return self();
+        }
+
+        public B scopes(String... scopes) {
+            this.scopes = List.of(scopes);
+            return self();
+        }
+
+        public B oauthResource(String oauthResource) {
+            this.oauthResource = requireText(oauthResource, "oauthResource");
             return self();
         }
 
@@ -234,6 +282,7 @@ public final class McpServerConfig {
         private String bearerTokenEnvVar;
         private final Map<String, String> httpHeaders = new LinkedHashMap<>();
         private final Map<String, String> envHttpHeaders = new LinkedHashMap<>();
+        private String httpHeadersHelper;
         private McpAuthMode auth;
         private McpOAuthConfig oauth;
 
@@ -263,6 +312,11 @@ public final class McpServerConfig {
             return this;
         }
 
+        public HttpBuilder httpHeadersHelper(String command) {
+            httpHeadersHelper = requireText(command, "httpHeadersHelper");
+            return this;
+        }
+
         public HttpBuilder auth(McpAuthMode auth) {
             this.auth = Objects.requireNonNull(auth, "auth");
             return this;
@@ -278,7 +332,13 @@ public final class McpServerConfig {
             return new McpServerConfig(
                     this,
                     new StreamableHttp(
-                            url, bearerTokenEnvVar, httpHeaders, envHttpHeaders, auth, oauth));
+                            url,
+                            bearerTokenEnvVar,
+                            httpHeaders,
+                            envHttpHeaders,
+                            httpHeadersHelper,
+                            auth,
+                            oauth));
         }
     }
 

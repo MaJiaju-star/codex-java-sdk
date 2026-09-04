@@ -28,6 +28,7 @@ ENUM_TARGETS = {
     "SandboxMode": "ThreadStartParams",
     "SortDirection": "ThreadListParams",
     "ThreadActiveFlag": "ThreadListResponse",
+    "ThreadHistoryMode": "ThreadListResponse",
     "ThreadSourceKind": "ThreadListParams",
     "ThreadStartSource": "ThreadStartParams",
     "ThreadSortKey": "ThreadListParams",
@@ -37,6 +38,8 @@ ENUM_TARGETS = {
 
 RECORD_TARGETS = {
     "GitInfo": ("ThreadListResponse", "definition"),
+    "MisalignmentErrorDetails": ("ThreadListResponse", "definition"),
+    "MisalignmentSteer": ("ThreadListResponse", "definition"),
     "Thread": ("ThreadListResponse", "definition"),
     "ThreadArchiveParams": ("ThreadArchiveParams", "root"),
     "ThreadArchiveResponse": ("ThreadArchiveResponse", "root"),
@@ -56,6 +59,8 @@ GENERATED_TYPES = set(ENUM_TARGETS) | set(RECORD_TARGETS) | {
 TYPE_DESCRIPTIONS = {
     "ApprovalsReviewer": "审批请求的审核方。",
     "GitInfo": "创建会话时记录的 Git 仓库信息。",
+    "MisalignmentErrorDetails": "目标偏离拦截的公开说明和继续执行建议。",
+    "MisalignmentSteer": "确认继续执行时提交给下一轮的用户指令。",
     "Personality": "Codex 回复所采用的表达风格。",
     "ReasoningSummary": (
         "模型推理摘要的输出模式，可用于调试和理解模型的推理过程。详情参见 "
@@ -65,6 +70,7 @@ TYPE_DESCRIPTIONS = {
     "SortDirection": "会话列表的排序方向。",
     "Thread": "Codex 会话的强类型协议表示。",
     "ThreadActiveFlag": "活动会话当前正在执行的工作类别。",
+    "ThreadHistoryMode": "会话历史的存储模式。",
     "ThreadArchiveParams": "归档会话请求的参数。",
     "ThreadArchiveResponse": "归档会话请求的响应。",
     "ThreadListParams": "查询会话列表时使用的过滤和分页参数。",
@@ -86,6 +92,14 @@ FIELD_DESCRIPTIONS = {
         "originUrl": "Git 远程 origin 的 URL。",
         "sha": "创建会话时检出的 Git 提交 SHA。",
     },
+    "MisalignmentErrorDetails": {
+        "detailedExplanation": "向用户展示的本地化详细说明。",
+        "errorType": "开放式目标偏离分类。",
+        "steer": "确认继续执行时提交给下一轮的指令。",
+    },
+    "MisalignmentSteer": {
+        "message": "提交给下一轮的用户消息。",
+    },
     "Thread": {
         "agentNickname": "由 AgentControl 创建的子 Agent 所获得的可选随机唯一昵称。",
         "agentRole": "由 AgentControl 创建的子 Agent 所获得的可选角色。",
@@ -95,12 +109,15 @@ FIELD_DESCRIPTIONS = {
         "ephemeral": "该会话是否为临时会话且不应写入磁盘。",
         "forkedFromId": "该会话由其他会话派生时对应的源会话 ID。",
         "gitInfo": "创建会话时记录的可选 Git 元数据。",
+        "historyMode": "会话历史的存储模式。",
         "id": "会话标识；Codex 生成的会话 ID 使用 UUIDv7。",
+        "model": "该会话当前使用的模型标识。",
         "modelProvider": "该会话使用的模型提供方，例如 openai。",
         "name": "可选的用户可见会话标题。",
         "parentThreadId": "父会话 ID；只有当前会话是子 Agent 时才会设置。",
         "path": "会话在磁盘上的路径；该字段尚不稳定。",
         "preview": "会话预览，通常是第一条用户消息。",
+        "reasoningEffort": "该会话当前使用的推理强度。",
         "recencyAt": "用于会话新旧排序的 Unix 秒级时间戳。",
         "sessionId": "同一会话树中的多个会话共享的 Session ID。",
         "source": "会话来源，例如 CLI、VS Code、codex exec 或 codex app-server。",
@@ -158,6 +175,7 @@ FIELD_DESCRIPTIONS = {
         "additionalDetails": "额外的错误详情。",
         "codexErrorInfo": "Codex 提供的结构化错误信息。",
         "message": "可读的错误消息。",
+        "misalignment": "目标偏离拦截的公开说明和继续执行建议。",
     },
 }
 

@@ -53,11 +53,17 @@ class McpServerConfigTest {
                 .bearerTokenEnvVar("MCP_TOKEN")
                 .httpHeader("X-Tenant", "internal")
                 .envHttpHeader("Authorization", "MCP_AUTH_HEADER")
+                .httpHeadersHelper("resolve-headers")
                 .auth(McpAuthMode.OAUTH)
                 .oauth(McpOAuthConfig.builder()
                         .clientId("java-sdk")
+                        .callbackUrl(URI.create("http://127.0.0.1:8765/callback"))
                         .callbackPort(8765)
                         .build())
+                .environmentId("local")
+                .omitToolsFrom(McpToolExposureSurface.CODE_MODE, McpToolExposureSurface.DEFERRED)
+                .scopes("files.read", "files.write")
+                .oauthResource("https://mcp.example.com")
                 .build();
 
         var serialized = McpConfigOverrideSerializer.serialize("internal", config);
@@ -66,8 +72,13 @@ class McpServerConfigTest {
                         + "bearer_token_env_var=\"MCP_TOKEN\","
                         + "http_headers={\"X-Tenant\"=\"internal\"},"
                         + "env_http_headers={\"Authorization\"=\"MCP_AUTH_HEADER\"},"
-                        + "auth=\"oauth\",oauth={client_id=\"java-sdk\",callback_port=8765},"
-                        + "enabled=true}",
+                        + "http_headers_helper=\"resolve-headers\",auth=\"oauth\","
+                        + "oauth={client_id=\"java-sdk\","
+                        + "callback_url=\"http://127.0.0.1:8765/callback\",callback_port=8765},"
+                        + "enabled=true,environment_id=\"local\","
+                        + "omit_tools_from=[\"code_mode\",\"deferred\"],"
+                        + "scopes=[\"files.read\",\"files.write\"],"
+                        + "oauth_resource=\"https://mcp.example.com\"}",
                 serialized);
     }
 
@@ -110,6 +121,9 @@ class McpServerConfigTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> McpOAuthConfig.builder().callbackPort(65536).build());
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> McpOAuthConfig.builder().callbackUrl(URI.create("/callback")).build());
         assertThrows(
                 IllegalArgumentException.class,
                 () -> CodexClientConfig.builder()

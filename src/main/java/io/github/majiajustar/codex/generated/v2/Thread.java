@@ -18,13 +18,16 @@ import java.util.List;
  * @param ephemeral 该会话是否为临时会话且不应写入磁盘。
  * @param forkedFromId 该会话由其他会话派生时对应的源会话 ID。
  * @param gitInfo 创建会话时记录的可选 Git 元数据。
+ * @param historyMode 会话历史的存储模式。
  * @param id 会话标识；Codex 生成的会话 ID 使用 UUIDv7。
+ * @param model 该会话当前使用的模型标识。
  * @param modelProvider 该会话使用的模型提供方，例如 openai。
  * @param name 可选的用户可见会话标题。
  * @param parentThreadId 父会话 ID；只有当前会话是子 Agent 时才会设置。
  * @param path 会话在磁盘上的路径；该字段尚不稳定。
  * @param preview 会话预览，通常是第一条用户消息。
  * @param projectId projectId 协议字段的值。
+ * @param reasoningEffort 该会话当前使用的推理强度。
  * @param recencyAt 用于会话新旧排序的 Unix 秒级时间戳。
  * @param section section 协议字段的值。
  * @param sectionEnteredAt sectionEnteredAt 协议字段的值。
@@ -47,13 +50,16 @@ public record Thread(
         boolean ephemeral,
         String forkedFromId,
         GitInfo gitInfo,
+        ThreadHistoryMode historyMode,
         String id,
+        String model,
         String modelProvider,
         String name,
         String parentThreadId,
         String path,
         String preview,
         String projectId,
+        String reasoningEffort,
         Long recencyAt,
         JsonNode section,
         Long sectionEnteredAt,

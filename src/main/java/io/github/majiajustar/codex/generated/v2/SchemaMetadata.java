@@ -7,7 +7,7 @@ package io.github.majiajustar.codex.generated.v2;
  */
 public final class SchemaMetadata {
     /** app-server v2 聚合 Schema 的 SHA-256 摘要。 */
-    public static final String SHA256 = "f7f448fce148b1ad47d5d7ea3d05a56f14c21a2b7dc64580966b56cc97389514";
+    public static final String SHA256 = "d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a";
 
     private SchemaMetadata() {}
 }

@@ -24,6 +24,8 @@
 13. [公开 API 速查](13-api-reference.md)
 14. [Solon Web SSE 多会话完整案例](14-solon-sse-complete-example.md)
 15. [从 app-server Schema 生成 Java 类型](15-schema-code-generation.md)
+16. [MCP 运行时 API](16-mcp-runtime.md)
+17. [Goal、Skills 与 Config API](17-goals-skills-config.md)
 
 ## 当前版本能力
 
@@ -42,6 +44,9 @@
 - JSON Schema 结构化输出；
 - 强类型命令/文件审批、工具前后拦截器和生命周期观察器；
 - 面向 Web UI 的跨平台命令事件、实时终端输出和异步人工审批案例；
+- MCP Server 强类型启动配置、状态查询、重新加载、OAuth、资源读取和工具调用；
+- Thread Goal、Skill 发现/启停，以及分层 Config 读写和管理员约束；
+- Goal、Skills、Thread 生命周期、计划、diff 和配置诊断等 WebIDE 高频通知；
 - 原始 JSON-RPC 入口，用于尚未添加便捷方法的 app-server API。
 
 生成层目前覆盖 Java SDK 公开便捷 API 使用的核心 v2 类型，而不是把 500 多个 Schema
@@ -59,6 +64,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.majiajustar.codex.*;
 import io.github.majiajustar.codex.event.*;
+import io.github.majiajustar.codex.goal.*;
+import io.github.majiajustar.codex.skills.*;
+import io.github.majiajustar.codex.config.*;
 import io.github.majiajustar.codex.exception.*;
 import io.github.majiajustar.codex.generated.v2.*;
 import io.github.majiajustar.codex.mcp.*;
@@ -72,6 +80,9 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.*;
 ```
 

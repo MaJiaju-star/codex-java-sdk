@@ -178,11 +178,17 @@ McpServerConfig server = McpServerConfig.streamableHttp(
         .bearerTokenEnvVar("MCP_TOKEN")
         .httpHeader("X-Tenant", "internal")
         .envHttpHeader("Authorization", "MCP_AUTH_HEADER")
+        .httpHeadersHelper("resolve-mcp-headers")
         .auth(McpAuthMode.OAUTH)
         .oauth(McpOAuthConfig.builder()
                 .clientId("internal-client")
+                .callbackUrl(URI.create("http://127.0.0.1:8765/callback"))
                 .callbackPort(8765)
                 .build())
+        .environmentId("local")
+        .omitToolsFrom(McpToolExposureSurface.CODE_MODE)
+        .scopes("files.read", "files.write")
+        .oauthResource("https://mcp.internal.example.com")
         .enabled(true)
         .build();
 
@@ -204,8 +210,13 @@ CodexClientConfig config = CodexClientConfig.builder()
 | `bearerTokenEnvVar(String)` | `bearer_token_env_var` | HTTP |
 | `httpHeader(name, value)` | `http_headers` | HTTP |
 | `envHttpHeader(name, envName)` | `env_http_headers` | HTTP |
+| `httpHeadersHelper(command)` | `http_headers_helper` | HTTP |
 | `auth(McpAuthMode)` | `auth` | HTTP |
 | `oauth(McpOAuthConfig)` | `oauth` | HTTP |
+| `environmentId(String)` | `environment_id` | 两者 |
+| `omitToolsFrom(...)` | `omit_tools_from` | 两者 |
+| `scopes(...)` | `scopes` | 两者 |
+| `oauthResource(String)` | `oauth_resource` | 两者 |
 | `enabled(boolean)` | `enabled` | 两者 |
 | `required(boolean)` | `required` | 两者 |
 | `startupTimeout(Duration)` | `startup_timeout_sec` | 两者 |

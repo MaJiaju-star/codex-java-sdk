@@ -43,6 +43,87 @@ public final class MockAppServer {
                         result.set("thread", thread());
                         reply(out, message, result);
                     }
+                    case "thread/goal/set" -> {
+                        var result = JSON.createObjectNode();
+                        result.set("goal", goal(message.path("params")));
+                        reply(out, message, result);
+                    }
+                    case "thread/goal/get" -> {
+                        var result = JSON.createObjectNode();
+                        result.set("goal", goal(JSON.createObjectNode()
+                                .put("threadId", "thread-1")
+                                .put("objective", "Ship the Java SDK")
+                                .put("status", "active")
+                                .put("tokenBudget", 1000)));
+                        reply(out, message, result);
+                    }
+                    case "thread/goal/clear" ->
+                            reply(out, message, JSON.createObjectNode().put("cleared", true));
+                    case "skills/list" -> {
+                        var skill = JSON.createObjectNode()
+                                .put("name", "java-review")
+                                .put("description", "Review Java code")
+                                .put("shortDescription", "Java review")
+                                .put("path", "/skills/java-review/SKILL.md")
+                                .put("scope", "repo")
+                                .put("enabled", true)
+                                .putNull("pluginId");
+                        skill.putObject("interface")
+                                .put("displayName", "Java Review")
+                                .put("brandColor", "#336699");
+                        skill.putObject("dependencies")
+                                .putArray("tools")
+                                .add(JSON.createObjectNode()
+                                        .put("type", "command")
+                                        .put("value", "mvn")
+                                        .put("command", "mvn"));
+                        var entry = JSON.createObjectNode().put("cwd", "/workspace");
+                        entry.putArray("skills").add(skill);
+                        entry.putArray("errors");
+                        var result = JSON.createObjectNode();
+                        result.putArray("data").add(entry);
+                        reply(out, message, result);
+                    }
+                    case "skills/extraRoots/set" -> reply(out, message, JSON.createObjectNode());
+                    case "skills/config/write" -> reply(
+                            out,
+                            message,
+                            JSON.createObjectNode().put(
+                                    "effectiveEnabled",
+                                    message.path("params").path("enabled").asBoolean()));
+                    case "config/read" -> {
+                        var source = JSON.createObjectNode()
+                                .put("type", "user")
+                                .put("file", "/home/test/.codex/config.toml")
+                                .putNull("profile");
+                        var metadata = JSON.createObjectNode().put("version", "v1");
+                        metadata.set("name", source);
+                        var result = JSON.createObjectNode();
+                        result.putObject("config").put("model", "gpt-test").put("web_search", "live");
+                        result.putObject("origins").set("model", metadata);
+                        var layer = JSON.createObjectNode().put("version", "v1");
+                        layer.set("name", source);
+                        layer.putObject("config").put("model", "gpt-test");
+                        result.putArray("layers").add(layer);
+                        reply(out, message, result);
+                    }
+                    case "config/value/write", "config/batchWrite" -> reply(
+                            out,
+                            message,
+                            JSON.createObjectNode()
+                                    .put("filePath", "/home/test/.codex/config.toml")
+                                    .put("status", "ok")
+                                    .put("version", "v2"));
+                    case "configRequirements/read" -> {
+                        var requirements = JSON.createObjectNode()
+                                .put("allowBrowserAndComputerUse", false)
+                                .put("additionalDeveloperInstructions", "Use internal services only");
+                        requirements.putArray("allowedSandboxModes").add("workspace-write");
+                        requirements.putArray("allowedWebSearchModes").add("disabled").add("cached");
+                        var result = JSON.createObjectNode();
+                        result.set("requirements", requirements);
+                        reply(out, message, result);
+                    }
                     case "model/list" -> {
                         var model = JSON.createObjectNode()
                                 .put("id", "gpt-test")
@@ -65,6 +146,55 @@ public final class MockAppServer {
                         var result = JSON.createObjectNode();
                         result.putArray("data").add(model);
                         result.putNull("nextCursor");
+                        reply(out, message, result);
+                    }
+                    case "mcpServerStatus/list" -> {
+                        var status = JSON.createObjectNode()
+                                .put("name", "docs")
+                                .put("runtimeStatus", "connected")
+                                .putNull("pluginId")
+                                .put("authStatus", "bearerToken");
+                        status.putObject("serverInfo")
+                                .put("name", "docs")
+                                .put("version", "1.0.0")
+                                .put("title", "Documentation");
+                        status.putObject("tools")
+                                .putObject("search")
+                                .put("name", "search")
+                                .putObject("inputSchema")
+                                .put("type", "object");
+                        status.putArray("resources").add(JSON.createObjectNode()
+                                .put("uri", "docs://guide")
+                                .put("name", "guide"));
+                        status.putArray("resourceTemplates");
+                        var result = JSON.createObjectNode().putNull("nextCursor");
+                        result.putArray("data").add(status);
+                        reply(out, message, result);
+                    }
+                    case "config/mcpServer/reload" -> reply(out, message, JSON.createObjectNode());
+                    case "mcpServer/oauth/login" -> reply(
+                            out,
+                            message,
+                            JSON.createObjectNode().put(
+                                    "authorizationUrl", "https://auth.example.com/authorize"));
+                    case "mcpServer/resource/read" -> {
+                        var result = JSON.createObjectNode().put("originCallId", "call-1");
+                        result.putArray("contents")
+                                .add(JSON.createObjectNode()
+                                        .put("uri", "docs://guide")
+                                        .put("mimeType", "text/plain")
+                                        .put("text", "guide text"))
+                                .add(JSON.createObjectNode()
+                                        .put("uri", "docs://logo")
+                                        .put("mimeType", "image/png")
+                                        .put("blob", "aW1hZ2U="));
+                        reply(out, message, result);
+                    }
+                    case "mcpServer/tool/call" -> {
+                        var result = JSON.createObjectNode().put("isError", false);
+                        result.putArray("content")
+                                .add(JSON.createObjectNode().put("type", "text").put("text", "found"));
+                        result.putObject("structuredContent").put("matches", 1);
                         reply(out, message, result);
                     }
                     case "test/overload" -> {
@@ -206,6 +336,23 @@ public final class MockAppServer {
         thread.set("status", JSON.createObjectNode().put("type", "idle"));
         thread.putArray("turns");
         return thread;
+    }
+
+    private static ObjectNode goal(JsonNode params) {
+        var goal = JSON.createObjectNode()
+                .put("threadId", params.path("threadId").asText("thread-1"))
+                .put("objective", params.path("objective").asText("Ship the Java SDK"))
+                .put("status", params.path("status").asText("active"))
+                .put("tokensUsed", 120)
+                .put("timeUsedSeconds", 15)
+                .put("createdAt", 100)
+                .put("updatedAt", 200);
+        if (params.path("tokenBudget").isNumber()) {
+            goal.put("tokenBudget", params.path("tokenBudget").asLong());
+        } else {
+            goal.putNull("tokenBudget");
+        }
+        return goal;
     }
 
     private static void notify(BufferedWriter out, String method, JsonNode params) throws Exception {

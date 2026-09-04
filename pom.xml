@@ -6,7 +6,7 @@
 
   <groupId>io.github.majiajustar</groupId>
   <artifactId>codex-java-sdk</artifactId>
-  <version>0.0.0-SNAPSHOT</version>
+  <version>0.0.1-SNAPSHOT</version>
   <name>Unofficial Codex Java SDK</name>
   <description>Unofficial Java SDK for Codex app-server</description>
   <url>https://github.com/MaJiaju-star/codex-java-sdk</url>

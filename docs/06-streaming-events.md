@@ -94,9 +94,21 @@ app-server 事件种类会随版本增加。`event.type()` 把已知方法映射
 | `item/completed` | Item 完成，包含完整 Item |
 | `item/agentMessage/delta` | 代理回答文本增量 |
 | `item/reasoning/summaryTextDelta` | 推理摘要增量 |
+| `item/reasoning/summaryPartAdded` | 推理摘要新增分段 |
 | `item/commandExecution/outputDelta` | 命令输出增量 |
+| `item/commandExecution/terminalInteraction` | 命令收到了终端输入 |
 | `item/fileChange/outputDelta` | 文件修改相关增量 |
+| `item/mcpToolCall/progress` | MCP 工具调用进度 |
+| `mcpServer/startupStatus/updated` | MCP Server 启动或重连状态 |
+| `mcpServer/oauthLogin/completed` | MCP OAuth 登录完成 |
 | `thread/tokenUsage/updated` | Token 用量更新 |
+| `thread/goal/updated` | 长期目标或其用量、状态更新 |
+| `thread/goal/cleared` | 长期目标被清除 |
+| `skills/changed` | Skill 缓存失效，应重新调用 `skills/list` |
+| `turn/diff/updated` | 当前 Turn 聚合 diff 更新 |
+| `turn/plan/updated` | 当前 Turn 计划更新 |
+| `serverRequest/resolved` | 审批请求已经被某个客户端解决 |
+| `configWarning` | 配置文件校验或加载警告 |
 | `turn/completed` | Turn 结束 |
 
 枚举 switch 应处理 `UNKNOWN`，从而兼容比 SDK 更新的 CLI。

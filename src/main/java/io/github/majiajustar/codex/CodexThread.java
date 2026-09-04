@@ -3,6 +3,7 @@ package io.github.majiajustar.codex;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.majiajustar.codex.generated.v2.ThreadArchiveResponse;
 import io.github.majiajustar.codex.generated.v2.ThreadUnarchiveResponse;
+import io.github.majiajustar.codex.goal.ThreadGoals;
 import io.github.majiajustar.codex.internal.JsonSupport;
 import io.github.majiajustar.codex.thread.ThreadOptions;
 import io.github.majiajustar.codex.turn.TurnOptions;
@@ -19,15 +20,22 @@ import java.util.Objects;
 public final class CodexThread {
     private final CodexClient client;
     private final String id;
+    private final ThreadGoals goals;
 
     CodexThread(CodexClient client, String id) {
         this.client = client;
         this.id = id;
+        goals = new ThreadGoals(client, id);
     }
 
     /** 返回稳定的 app-server 会话 ID。 */
     public String id() {
         return id;
+    }
+
+    /** 返回该会话的持久化 Goal API。 */
+    public ThreadGoals goals() {
+        return goals;
     }
 
     /** 启动文本轮次并阻塞等待其进入终态。 */

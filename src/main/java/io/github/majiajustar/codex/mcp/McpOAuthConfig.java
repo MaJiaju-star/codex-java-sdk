@@ -1,12 +1,21 @@
 package io.github.majiajustar.codex.mcp;
 
+import java.net.URI;
 import java.util.Objects;
 
 /** Codex 启动 MCP OAuth 流程时使用的客户端配置。 */
-public record McpOAuthConfig(String clientId, Integer callbackPort) {
+public record McpOAuthConfig(String clientId, URI callbackUrl, Integer callbackPort) {
+    /** 兼容原有仅指定客户端 ID 和回调端口的构造方式。 */
+    public McpOAuthConfig(String clientId, Integer callbackPort) {
+        this(clientId, null, callbackPort);
+    }
+
     public McpOAuthConfig {
         if (clientId != null && clientId.isBlank()) {
             throw new IllegalArgumentException("MCP OAuth clientId must not be blank");
+        }
+        if (callbackUrl != null && !callbackUrl.isAbsolute()) {
+            throw new IllegalArgumentException("MCP OAuth callbackUrl must be absolute");
         }
         if (callbackPort != null && (callbackPort < 0 || callbackPort > 65535)) {
             throw new IllegalArgumentException("MCP OAuth callbackPort must be between 0 and 65535");
@@ -21,10 +30,16 @@ public record McpOAuthConfig(String clientId, Integer callbackPort) {
     /** 用于构建不可变 OAuth 配置。 */
     public static final class Builder {
         private String clientId;
+        private URI callbackUrl;
         private Integer callbackPort;
 
         public Builder clientId(String clientId) {
             this.clientId = Objects.requireNonNull(clientId, "clientId");
+            return this;
+        }
+
+        public Builder callbackUrl(URI callbackUrl) {
+            this.callbackUrl = Objects.requireNonNull(callbackUrl, "callbackUrl");
             return this;
         }
 
@@ -34,7 +49,7 @@ public record McpOAuthConfig(String clientId, Integer callbackPort) {
         }
 
         public McpOAuthConfig build() {
-            return new McpOAuthConfig(clientId, callbackPort);
+            return new McpOAuthConfig(clientId, callbackUrl, callbackPort);
         }
     }
 }

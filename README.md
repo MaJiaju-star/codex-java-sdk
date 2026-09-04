@@ -22,7 +22,7 @@ Solon Web SSE 完整示例：[多会话流式对话案例](examples/solon-sse-ch
 <dependency>
   <groupId>io.github.majiajustar</groupId>
   <artifactId>codex-java-sdk</artifactId>
-  <version>0.0.0-SNAPSHOT</version>
+  <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -40,6 +40,9 @@ SDK 提交了从 app-server v2 Schema 生成的 Java record 和 enum。生成或
 mvn -Pgenerate-protocol generate-sources
 mvn -Pcheck-protocol validate
 ```
+
+当前生成快照以 Codex `v0.153.0` 的 app-server v2 Schema 为基线。检查其他源码目录时，
+通过 `CODEX_REPO_ROOT` 显式指定对应的 Codex 仓库根目录。
 
 ## 快速开始
 
@@ -70,7 +73,10 @@ io.github.majiajustar.codex            客户端、配置、Thread/Turn 运行�
 io.github.majiajustar.codex.thread     Thread 配置和列表选项
 io.github.majiajustar.codex.turn       Turn 配置、输入、结果和 Usage
 io.github.majiajustar.codex.event      事件、通知和 Item
-io.github.majiajustar.codex.mcp        MCP Server 注册、认证和工具审批配置
+io.github.majiajustar.codex.goal       Thread 长期目标、状态和用量
+io.github.majiajustar.codex.skills     Skill 发现、依赖和启停
+io.github.majiajustar.codex.config     分层配置读写与管理员约束
+io.github.majiajustar.codex.mcp        MCP Server 注册、运行时管理、资源与工具调用
 io.github.majiajustar.codex.model      模型目录类型
 io.github.majiajustar.codex.tool       审批、拦截器和工具生命周期
 io.github.majiajustar.codex.sandbox    沙箱策略
@@ -141,6 +147,47 @@ Streamable HTTP 使用 `McpServerConfig.streamableHttp(URI)` 创建，并支持�
 OAuth 配置。SDK 不提供明文 bearer token 配置；`bearerTokenEnvVar(...)` 只把环境变量名称写入
 Codex 配置，实际密钥通过子进程环境传递。完整示例、字段和安全说明见
 [配置教程](docs/03-configuration.md)与[审批、安全和沙箱](docs/08-approvals-and-security.md)。
+
+创建 Client 后，可通过 `codex.mcp()` 使用 v0.153 app-server 的 MCP 运行时 API：
+
+```java
+McpServerStatusPage statuses = codex.mcp().listStatuses();
+McpResourceReadResult resource = codex.mcp().readResource(
+        McpResourceReadRequest.create("docs", URI.create("docs://guide")));
+McpToolCallResponse response = codex.mcp().callTool(
+        McpToolCallRequest.create(thread.id(), "docs", "search", arguments));
+```
+
+还支持重新加载配置以及启动 OAuth 登录。完整说明见
+[MCP 运行时 API](docs/16-mcp-runtime.md)。
+
+## Goal、Skills 与运行时配置
+
+Thread Goal 适合长时间运行、带预算或可暂停的 Agent 任务：
+
+```java
+ThreadGoal goal = thread.goals().set(GoalUpdate.builder()
+        .objective("修复项目并通过全部测试")
+        .tokenBudget(200_000)
+        .build());
+```
+
+Skills 和 Config 是连接级 API：
+
+```java
+SkillsListResult skills = codex.skills().list(
+        new SkillsListOptions(List.of(Path.of("D:/workspace/project")), false));
+
+ConfigSnapshot config = codex.config().read(
+        new ConfigReadOptions(Path.of("D:/workspace/project"), true));
+
+ConfigWriteResult updated = codex.config().write(
+        ConfigWriteRequest.replace("web_search", "cached"));
+```
+
+配置写入支持 `expectedVersion` 乐观并发控制和批量修改；管理员限制可通过
+`codex.config().requirements()` 查询。完整说明见
+[Goal、Skills 与 Config API](docs/17-goals-skills-config.md)。
 
 ## 流式事件
 

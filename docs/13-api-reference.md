@@ -70,6 +70,25 @@ JsonNode request(String method, JsonNode params)
 CompletableFuture<JsonNode> requestAsync(String method, JsonNode params)
 ```
 
+### MCP 运行时
+
+```java
+McpClient mcp()
+```
+
+`McpClient` 提供 `listStatuses`、`reload`、`startOAuthLogin`、`readResource` 和
+`callTool`。请求和响应类型位于 `io.github.majiajustar.codex.mcp`。
+
+### Skills 与 Config
+
+```java
+SkillsClient skills()
+ConfigClient config()
+```
+
+`SkillsClient` 提供 `list`、`setExtraRoots`、按名称或路径启用/禁用 Skill。
+`ConfigClient` 提供 `read`、`write`、`batchWrite` 和 `requirements`。
+
 ### 关闭
 
 ```java
@@ -136,7 +155,7 @@ CodexClientConfig.builder()
 | 命令 | Windows 使用 `cmd.exe /d /c codex app-server`，其他平台使用 `codex app-server` |
 | clientName | `codex_java_sdk` |
 | clientTitle | `Codex Java SDK` |
-| clientVersion | `0.0.0-SNAPSHOT` |
+| clientVersion | `0.0.1-SNAPSHOT` |
 | experimentalApi | `true` |
 | requestTimeout | 60 秒 |
 | retryPolicy | 过载最多尝试 3 次，250 ms 起始指数退避 |
@@ -146,9 +165,10 @@ CodexClientConfig.builder()
 
 通过 `McpServerConfig.stdio(String)` 或 `McpServerConfig.streamableHttp(URI)` 创建。
 
-两种 Builder 共享 `enabled`、`required`、两个 `Duration` 超时、并行调用开关、工具白/黑名单、
-默认审批模式和单工具审批配置。stdio 专用方法为 `args`、`env`、`envVar`、`cwd`；HTTP 专用方法为
-`bearerTokenEnvVar`、`httpHeader`、`envHttpHeader`、`auth`、`oauth`。
+两种 Builder 共享 `enabled`、`required`、两个 `Duration` 超时、`environmentId`、
+`omitToolsFrom`、`scopes`、`oauthResource`、并行调用开关、工具白/黑名单、默认审批模式和单工具
+审批配置。stdio 专用方法为 `args`、`env`、`envVar`、`cwd`；HTTP 专用方法为
+`bearerTokenEnvVar`、`httpHeader`、`envHttpHeader`、`httpHeadersHelper`、`auth`、`oauth`。
 
 环境变量引用使用 `McpEnvVar.inherit/local/remote`，工具审批使用
 `McpToolConfig.approval(...)`，OAuth 使用 `McpOAuthConfig.builder()`。
@@ -202,6 +222,7 @@ ThreadOptions.ApprovalPolicy.NEVER
 
 ```java
 String id()
+ThreadGoals goals()
 ```
 
 同步执行：
@@ -310,8 +331,9 @@ event.type()   // CodexEventType；未知方法返回 UNKNOWN
 event.notification() // 已知通知的 sealed 强类型视图
 ```
 
-`CodexNotification` 为 sealed interface，当前覆盖 Turn、Item、流式 delta、Usage 和
-Thread 的高频通知。未知方法返回 `CodexNotification.Unknown`，原始参数仍可通过
+`CodexNotification` 为 sealed interface，当前覆盖 Turn、Item、流式 delta、Usage、Thread 和
+MCP 生命周期，以及 Goal、Skills、计划、diff、配置诊断等高频通知。未知方法返回
+`CodexNotification.Unknown`，原始参数仍可通过
 `raw()` 获取。
 
 已知枚举值：
@@ -324,13 +346,34 @@ ITEM_COMPLETED
 AGENT_MESSAGE_DELTA
 REASONING_TEXT_DELTA
 REASONING_SUMMARY_TEXT_DELTA
+REASONING_SUMMARY_PART_ADDED
 COMMAND_OUTPUT_DELTA
+TERMINAL_INTERACTION
 FILE_CHANGE_PATCH_UPDATED
 MCP_TOOL_CALL_PROGRESS
+MCP_SERVER_STATUS_UPDATED
+MCP_SERVER_OAUTH_LOGIN_COMPLETED
 PLAN_DELTA
 TOKEN_USAGE_UPDATED
 THREAD_STARTED
 THREAD_STATUS_CHANGED
+THREAD_ARCHIVED
+THREAD_UNARCHIVED
+THREAD_DELETED
+THREAD_CLOSED
+THREAD_REVERTED
+THREAD_NAME_UPDATED
+THREAD_GOAL_UPDATED
+THREAD_GOAL_CLEARED
+SKILLS_CHANGED
+TURN_DIFF_UPDATED
+TURN_PLAN_UPDATED
+SERVER_REQUEST_RESOLVED
+CONTEXT_COMPACTED
+WARNING
+CONFIG_WARNING
+DEPRECATION_NOTICE
+MODEL_REROUTED
 ERROR
 UNKNOWN
 ```
@@ -338,7 +381,32 @@ UNKNOWN
 `CodexEventType.fromMethod(String)` 可把协议方法转换为枚举，`method()` 返回对应的原始
 方法名；`UNKNOWN.method()` 为 `null`。
 
-## 9. 工具审批与生命周期扩展
+## 9. Goal、Skills 与 Config
+
+```java
+ThreadGoal ThreadGoals.set(GoalUpdate update)
+Optional<ThreadGoal> ThreadGoals.get()
+boolean ThreadGoals.clear()
+
+SkillsListResult SkillsClient.list()
+SkillsListResult SkillsClient.list(SkillsListOptions options)
+void SkillsClient.setExtraRoots(List<Path> roots)
+boolean SkillsClient.enableByName(String name)
+boolean SkillsClient.disableByName(String name)
+boolean SkillsClient.enable(Path path)
+boolean SkillsClient.disable(Path path)
+
+ConfigSnapshot ConfigClient.read()
+ConfigSnapshot ConfigClient.read(ConfigReadOptions options)
+ConfigWriteResult ConfigClient.write(ConfigWriteRequest request)
+ConfigWriteResult ConfigClient.batchWrite(ConfigBatchWriteRequest request)
+ConfigRequirements ConfigClient.requirements()
+```
+
+`ConfigSnapshot.config()` 和 `ConfigRequirements.raw()` 保留开放的 JSON 配置主体；配置层、
+来源、版本、写入状态和常见限制提供强类型访问。详见第 17 章。
+
+## 10. 工具审批与生命周期扩展
 
 ```java
 ApprovalHandler.requestApproval(ApprovalRequest request)
@@ -439,7 +507,7 @@ new ToolInterceptor.BeforeResult.Decide(ApprovalRequest.Decision.DECLINE)
 前置拦截器按注册顺序执行，`Decide` 会短路后续审批；完成回调按相反顺序执行。
 `ApprovalHandler` 可以异步返回未完成的 `CompletionStage`，用于等待 Web 用户审批。
 
-## 10. TurnResult
+## 11. TurnResult
 
 ```java
 public record TurnResult(
@@ -469,7 +537,7 @@ result.typedTurn()  // generated.v2.Turn
 降级为 `CodexItem.Unknown`。Agent 最终答复阶段对应
 `CodexItem.MessagePhase.FINAL_ANSWER`，协议值为 `final_answer`。
 
-## 11. CodexException
+## 12. CodexException
 
 ```java
 public class CodexException extends RuntimeException
@@ -482,7 +550,7 @@ CodexException(String message)
 CodexException(String message, Throwable cause)
 ```
 
-## 12. JsonRpcException
+## 13. JsonRpcException
 
 ```java
 public class JsonRpcException extends CodexException
@@ -502,7 +570,7 @@ String getMessage()
 过载映射为 `ServerBusyException`，服务端内部重试耗尽映射为
 `RetryLimitExceededException`。
 
-## 13. 完整组合示例
+## 14. 完整组合示例
 
 ```java
 import io.github.majiajustar.codex.*;

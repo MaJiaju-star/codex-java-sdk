@@ -13,7 +13,7 @@
 
   <groupId>io.github.majiajustar.codex.examples</groupId>
   <artifactId>solon-sse-chat</artifactId>
-  <version>0.0.0-SNAPSHOT</version>
+  <version>0.0.1-SNAPSHOT</version>
   <name>Codex Java SDK - Solon SSE Chat Example</name>
 
   <properties>
@@ -46,7 +46,7 @@
     <dependency>
       <groupId>io.github.majiajustar</groupId>
       <artifactId>codex-java-sdk</artifactId>
-      <version>0.0.0-SNAPSHOT</version>
+      <version>0.0.1-SNAPSHOT</version>
     </dependency>
   </dependencies>
 

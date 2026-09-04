@@ -13,11 +13,13 @@ import java.util.List;
  * @param additionalDetails 额外的错误详情。
  * @param codexErrorInfo Codex 提供的结构化错误信息。
  * @param message 可读的错误消息。
+ * @param misalignment 目标偏离拦截的公开说明和继续执行建议。
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TurnError(
         String additionalDetails,
         JsonNode codexErrorInfo,
-        String message
+        String message,
+        MisalignmentErrorDetails misalignment
 ) {}

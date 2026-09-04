@@ -28,6 +28,9 @@ public final class McpConfigOverrideSerializer {
             case McpServerConfig.StreamableHttp http -> addHttp(fields, http);
         }
         fields.add("enabled=" + config.enabled());
+        if (config.environmentId() != null) {
+            fields.add("environment_id=" + string(config.environmentId()));
+        }
         if (config.required()) fields.add("required=true");
         if (config.startupTimeout() != null) {
             fields.add("startup_timeout_sec=" + seconds(config.startupTimeout()));
@@ -38,11 +41,20 @@ public final class McpConfigOverrideSerializer {
         if (config.supportsParallelToolCalls()) {
             fields.add("supports_parallel_tool_calls=true");
         }
+        if (config.omitToolsFrom() != null) {
+            fields.add("omit_tools_from=" + stringArray(config.omitToolsFrom().stream()
+                    .map(io.github.majiajustar.codex.mcp.McpToolExposureSurface::wireValue)
+                    .toList()));
+        }
         if (config.enabledTools() != null) {
             fields.add("enabled_tools=" + stringArray(config.enabledTools()));
         }
         if (config.disabledTools() != null) {
             fields.add("disabled_tools=" + stringArray(config.disabledTools()));
+        }
+        if (config.scopes() != null) fields.add("scopes=" + stringArray(config.scopes()));
+        if (config.oauthResource() != null) {
+            fields.add("oauth_resource=" + string(config.oauthResource()));
         }
         if (config.defaultToolsApprovalMode() != null) {
             fields.add("default_tools_approval_mode="
@@ -79,6 +91,9 @@ public final class McpConfigOverrideSerializer {
         if (!http.envHttpHeaders().isEmpty()) {
             fields.add("env_http_headers=" + stringMap(http.envHttpHeaders()));
         }
+        if (http.httpHeadersHelper() != null) {
+            fields.add("http_headers_helper=" + string(http.httpHeadersHelper()));
+        }
         if (http.auth() != null) fields.add("auth=" + string(http.auth().wireValue()));
         if (http.oauth() != null) fields.add("oauth=" + oauth(http.oauth()));
     }
@@ -96,6 +111,9 @@ public final class McpConfigOverrideSerializer {
     private static String oauth(McpOAuthConfig oauth) {
         var fields = new ArrayList<String>();
         if (oauth.clientId() != null) fields.add("client_id=" + string(oauth.clientId()));
+        if (oauth.callbackUrl() != null) {
+            fields.add("callback_url=" + string(oauth.callbackUrl().toString()));
+        }
         if (oauth.callbackPort() != null) fields.add("callback_port=" + oauth.callbackPort());
         return "{" + String.join(",", fields) + "}";
     }

@@ -144,7 +144,7 @@ public record CodexClientConfig(
         private Boolean workspaceNetworkAccess;
         private String clientName = "codex_java_sdk";
         private String clientTitle = "Codex Java SDK";
-        private String clientVersion = "0.0.0-SNAPSHOT";
+        private String clientVersion = "0.0.1-SNAPSHOT";
         private boolean experimentalApi = true;
         private Duration requestTimeout = Duration.ofSeconds(60);
         private BiFunction<String, JsonNode, JsonNode> serverRequestHandler =
