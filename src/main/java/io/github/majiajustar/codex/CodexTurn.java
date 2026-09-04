@@ -2,6 +2,7 @@ package io.github.majiajustar.codex;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.majiajustar.codex.event.CodexEvent;
+import io.github.majiajustar.codex.event.CodexEventType;
 import io.github.majiajustar.codex.exception.CodexException;
 import io.github.majiajustar.codex.internal.JsonSupport;
 import io.github.majiajustar.codex.turn.TurnResult;
@@ -125,7 +126,7 @@ public final class CodexTurn {
             while (true) {
                 var event = channel.take();
                 if (publisher != null) publisher.submit(event);
-                if (event.method().equals("item/completed")) {
+                if (event.type() == CodexEventType.ITEM_COMPLETED) {
                     var item = event.params().path("item");
                     items.add(item);
                     if (item.path("type").asText().equals("agentMessage")) {
@@ -136,9 +137,9 @@ public final class CodexTurn {
                             unknownPhaseResponse = item.path("text").asText();
                         }
                     }
-                } else if (event.method().equals("thread/tokenUsage/updated")) {
+                } else if (event.type() == CodexEventType.TOKEN_USAGE_UPDATED) {
                     usage = event.params().get("tokenUsage");
-                } else if (event.method().equals("turn/completed")) {
+                } else if (event.type() == CodexEventType.TURN_COMPLETED) {
                     var turn = event.params().path("turn");
                     var status = turn.path("status").asText();
                     if (status.equals("failed")) {

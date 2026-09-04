@@ -22,7 +22,7 @@ Solon Web SSE 完整示例：[多会话流式对话案例](examples/solon-sse-ch
 <dependency>
   <groupId>io.github.majiajustar</groupId>
   <artifactId>codex-java-sdk</artifactId>
-  <version>0.0.2-SNAPSHOT</version>
+  <version>0.0.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -244,6 +244,9 @@ if (notification instanceof CodexNotification.ItemCompleted completed
     System.out.println(message.text());
 }
 
+System.out.println(notification.type());   // CodexEventType
+System.out.println(notification.method()); // 准确的 JSON-RPC method
+
 TokenUsage usage = result.typedUsage();
 List<CodexItem> items = result.typedItems();
 CodexModelList models = codex.listModels();
@@ -251,6 +254,8 @@ CodexModelList models = codex.listModels();
 
 无法识别的通知方法和未来新增的 Item 类型会转换为 `CodexNotification.Unknown` 和
 `CodexItem.Unknown`，而不是导致反序列化失败。原始载荷可以通过 `raw()` 获取。
+已知通知的 `method()` 由 `CodexEventType` 统一维护；`raw()` 则始终保留完整参数，供新版
+协议字段透传和诊断使用。
 
 ## 取消、追加指令与多目录
 

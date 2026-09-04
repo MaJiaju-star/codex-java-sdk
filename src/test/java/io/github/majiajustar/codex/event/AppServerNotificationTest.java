@@ -2,6 +2,7 @@ package io.github.majiajustar.codex.event;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.github.majiajustar.codex.goal.ThreadGoalStatus;
 import io.github.majiajustar.codex.internal.JsonSupport;
@@ -59,14 +60,75 @@ class AppServerNotificationTest {
         var archived = new CodexEvent(
                 "thread/archived", JsonSupport.MAPPER.readTree("{\"threadId\":\"thread-1\"}"));
         assertEquals(CodexEventType.THREAD_ARCHIVED, archived.type());
-        assertEquals(
-                "thread-1",
-                assertInstanceOf(CodexNotification.ThreadLifecycle.class, archived.notification())
-                        .threadId());
+        var lifecycle =
+                assertInstanceOf(CodexNotification.ThreadLifecycle.class, archived.notification());
+        assertEquals(CodexEventType.THREAD_ARCHIVED, lifecycle.type());
+        assertEquals("thread/archived", lifecycle.method());
+        assertEquals("thread-1", lifecycle.threadId());
 
         var skills = new CodexEvent("skills/changed", JsonSupport.MAPPER.createObjectNode());
         assertEquals(CodexEventType.SKILLS_CHANGED, skills.type());
         assertInstanceOf(CodexNotification.SkillsChanged.class, skills.notification());
+
+        var unknown = new CodexEvent("future/notification", JsonSupport.MAPPER.createObjectNode())
+                .notification();
+        assertEquals(CodexEventType.UNKNOWN, unknown.type());
+        assertEquals("future/notification", unknown.method());
+    }
+
+    @Test
+    void preservesTypedDeltaIndexesAndErrors() throws Exception {
+        var reasoning = notification("item/reasoning/textDelta", """
+                {
+                  "threadId":"thread-1",
+                  "turnId":"turn-1",
+                  "itemId":"item-1",
+                  "contentIndex":2,
+                  "delta":"details"
+                }
+                """);
+        var reasoningDelta = assertInstanceOf(CodexNotification.Delta.class, reasoning);
+        assertEquals(CodexEventType.REASONING_TEXT_DELTA, reasoningDelta.type());
+        assertEquals("item/reasoning/textDelta", reasoningDelta.method());
+        assertEquals(2L, reasoningDelta.contentIndex());
+        assertNull(reasoningDelta.summaryIndex());
+
+        var error = notification("error", """
+                {
+                  "threadId":"thread-1",
+                  "turnId":"turn-1",
+                  "willRetry":false,
+                  "error":{
+                    "message":"Provider rejected the request",
+                    "additionalDetails":"status=401"
+                  }
+                }
+                """);
+        var typedError = assertInstanceOf(CodexNotification.Error.class, error);
+        assertEquals(CodexEventType.ERROR, typedError.type());
+        assertEquals("Provider rejected the request", typedError.error().message());
+        assertEquals("status=401", typedError.error().additionalDetails());
+    }
+
+    @Test
+    void parsesStructuredFileChangeKinds() throws Exception {
+        var notification = notification("item/fileChange/patchUpdated", """
+                {
+                  "threadId":"thread-1",
+                  "turnId":"turn-1",
+                  "itemId":"item-1",
+                  "changes":[{
+                    "path":"src/New.java",
+                    "kind":{"type":"update","move_path":"src/Old.java"},
+                    "diff":"@@ -1 +1 @@"
+                  }]
+                }
+                """);
+        var fileChange =
+                assertInstanceOf(CodexNotification.FileChangePatchUpdated.class, notification);
+        assertEquals(
+                new CodexItem.PatchChangeKind.Update("src/Old.java"),
+                fileChange.changes().getFirst().kind());
     }
 
     private static CodexNotification notification(String method, String json) throws Exception {

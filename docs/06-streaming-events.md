@@ -118,14 +118,20 @@ app-server 事件种类会随版本增加。`event.type()` 把已知方法映射
 ```java
 @Override
 public void onNext(CodexEvent event) {
-    if (event.type() == CodexEventType.AGENT_MESSAGE_DELTA) {
-        String delta = event.params().path("delta").asText("");
-        System.out.print(delta);
+    if (event.notification() instanceof CodexNotification.Delta delta
+            && delta.type() == CodexEventType.AGENT_MESSAGE_DELTA) {
+        System.out.print(delta.delta());
     }
 }
 ```
 
+`CodexNotification.type()` 返回统一维护的 `CodexEventType`，`method()` 由该枚举得到准确的
+JSON-RPC 方法名。Reasoning delta 还会按协议保留 `contentIndex()` 或 `summaryIndex()`。
+
 增量适合实时 UI，但最终持久化应使用 `TurnResult.finalResponse()` 或完成的 `agentMessage` Item。仅拼接 delta 可能受重试、协议调整或多条代理消息影响。
+
+所有已知通知都同时保留 `raw()`。业务代码优先读取强类型字段；只有访问新版 SDK 尚未声明的
+字段或记录协议诊断信息时才读取原始 `JsonNode`。
 
 ## 6. 观察工具执行
 

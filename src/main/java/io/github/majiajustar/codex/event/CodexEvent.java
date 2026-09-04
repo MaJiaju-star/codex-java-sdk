@@ -14,7 +14,11 @@ public record CodexEvent(String method, JsonNode params) {
         return CodexEventType.fromMethod(method);
     }
 
-    /** Return a typed notification while retaining unknown methods as raw payloads. */
+    /**
+     * 返回强类型通知，同时为未知方法保留原始参数。
+     *
+     * @return 当前 SDK 能识别的最具体通知类型
+     */
     public CodexNotification notification() {
         return CodexNotification.from(this);
     }

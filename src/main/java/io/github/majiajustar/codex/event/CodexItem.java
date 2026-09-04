@@ -5,10 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Strongly typed view of an app-server {@code ThreadItem}.
+ * app-server {@code ThreadItem} 的强类型视图。
  *
- * <p>The most common item variants expose typed fields. New or less common variants are represented
- * by {@link Unknown}, which preserves the original payload for forward compatibility.
+ * <p>常用 Item 变体会公开强类型字段；新增或尚未展开的变体使用 {@link Unknown} 表示，并保留
+ * 原始载荷以支持协议前向兼容。
  */
 public sealed interface CodexItem
         permits CodexItem.UserMessage,
@@ -30,16 +30,33 @@ public sealed interface CodexItem
                 CodexItem.ExitedReviewMode,
                 CodexItem.ContextCompaction,
                 CodexItem.Unknown {
-    /** Item identifier assigned by Codex. */
+    /**
+     * 返回 Codex 分配的 Item ID。
+     *
+     * @return Item ID
+     */
     String id();
 
-    /** Exact app-server discriminator. */
+    /**
+     * 返回 app-server 使用的准确 Item 判别值。
+     *
+     * @return Item 类型判别值
+     */
     String type();
 
-    /** Original payload, including fields added by newer app-server versions. */
+    /**
+     * 返回完整原始载荷，其中包括新版 app-server 可能新增的字段。
+     *
+     * @return 原始 Item 载荷
+     */
     JsonNode raw();
 
-    /** Parse one app-server item without discarding unknown variants or fields. */
+    /**
+     * 解析一个 app-server Item，并保留未知变体和字段。
+     *
+     * @param item 原始 Item 载荷
+     * @return 当前 SDK 能识别的最具体 Item 类型
+     */
     static CodexItem from(JsonNode item) {
         var type = text(item, "type");
         var id = text(item, "id");
@@ -72,7 +89,7 @@ public sealed interface CodexItem
                     nullableLong(item, "durationMs"),
                     item);
             case "fileChange" -> new FileChange(
-                    id, fileChanges(item.path("changes")), text(item, "status"), item);
+                    id, fileUpdates(item.path("changes")), text(item, "status"), item);
             case "mcpToolCall" -> new McpToolCall(
                     id,
                     text(item, "server"),
@@ -137,7 +154,13 @@ public sealed interface CodexItem
         };
     }
 
-    /** Prompt fragments produced by a hook. */
+    /**
+     * Hook 生成的提示片段。
+     *
+     * @param id Item ID
+     * @param fragments Hook 生成的原始片段
+     * @param raw 完整原始 Item 载荷
+     */
     record HookPrompt(String id, List<JsonNode> fragments, JsonNode raw) implements CodexItem {
         public HookPrompt {
             fragments = List.copyOf(fragments);
@@ -149,12 +172,23 @@ public sealed interface CodexItem
         }
     }
 
-    /** Parse a list of raw item payloads. */
+    /**
+     * 解析一组原始 Item 载荷。
+     *
+     * @param items 原始 Item 数组
+     * @return 不可变的强类型 Item 列表
+     */
     static List<CodexItem> fromAll(List<JsonNode> items) {
         return items.stream().map(CodexItem::from).toList();
     }
 
-    /** User input persisted as a turn item. */
+    /**
+     * 作为 Turn Item 持久化的用户输入。
+     *
+     * @param id Item ID
+     * @param content 用户输入内容
+     * @param raw 完整原始 Item 载荷
+     */
     record UserMessage(String id, List<JsonNode> content, JsonNode raw) implements CodexItem {
         public UserMessage {
             content = List.copyOf(content);
@@ -166,7 +200,14 @@ public sealed interface CodexItem
         }
     }
 
-    /** Assistant text, including whether it is commentary or the terminal answer. */
+    /**
+     * 助手文本，以及该文本属于过程说明还是最终回答。
+     *
+     * @param id Item ID
+     * @param text 助手文本
+     * @param phase 消息阶段
+     * @param raw 完整原始 Item 载荷
+     */
     record AgentMessage(String id, String text, MessagePhase phase, JsonNode raw)
             implements CodexItem {
         @Override
@@ -175,7 +216,13 @@ public sealed interface CodexItem
         }
     }
 
-    /** Proposed or completed plan text. */
+    /**
+     * 建议中或已完成的计划文本。
+     *
+     * @param id Item ID
+     * @param text 计划文本
+     * @param raw 完整原始 Item 载荷
+     */
     record Plan(String id, String text, JsonNode raw) implements CodexItem {
         @Override
         public String type() {
@@ -183,7 +230,14 @@ public sealed interface CodexItem
         }
     }
 
-    /** Model reasoning summary and content fragments. */
+    /**
+     * 模型推理摘要和正文片段。
+     *
+     * @param id Item ID
+     * @param summary 推理摘要片段
+     * @param content 推理正文片段
+     * @param raw 完整原始 Item 载荷
+     */
     record Reasoning(String id, List<String> summary, List<String> content, JsonNode raw)
             implements CodexItem {
         public Reasoning {
@@ -197,7 +251,23 @@ public sealed interface CodexItem
         }
     }
 
-    /** Shell command lifecycle and result. */
+    /**
+     * Shell 命令的生命周期和执行结果。
+     *
+     * @param id Item ID
+     * @param pluginId 可选的来源插件 ID
+     * @param scriptPath 可选的脚本路径
+     * @param command 执行的命令
+     * @param cwd 命令工作目录
+     * @param processId 可选的进程 ID
+     * @param source 命令来源
+     * @param status 执行状态
+     * @param commandActions Codex 识别出的命令动作
+     * @param aggregatedOutput 聚合输出
+     * @param exitCode 进程退出码
+     * @param durationMs 执行耗时，单位为毫秒
+     * @param raw 完整原始 Item 载荷
+     */
     record CommandExecution(
             String id,
             String pluginId,
@@ -223,10 +293,69 @@ public sealed interface CodexItem
         }
     }
 
-    /** One file update included in a file-change item. */
-    record FileUpdate(String path, String kind, String diff) {}
+    /** 单个文件更新所表示的操作类型。 */
+    sealed interface PatchChangeKind {
+        /**
+         * 返回 app-server 使用的准确操作判别值。
+         *
+         * @return 操作判别值
+         */
+        String type();
 
-    /** File patch lifecycle and changes. */
+        /** 新增文件。 */
+        record Add() implements PatchChangeKind {
+            @Override
+            public String type() {
+                return "add";
+            }
+        }
+
+        /** 删除已有文件。 */
+        record Delete() implements PatchChangeKind {
+            @Override
+            public String type() {
+                return "delete";
+            }
+        }
+
+        /**
+         * 更新已有文件，并可同时移动文件。
+         *
+         * @param movePath 文件移动前的路径；未移动时为 {@code null}
+         */
+        record Update(String movePath) implements PatchChangeKind {
+            @Override
+            public String type() {
+                return "update";
+            }
+        }
+
+        /**
+         * 新版 app-server 引入且当前 SDK 尚未识别的补丁操作。
+         *
+         * @param type app-server 实际发送的操作判别值
+         * @param raw 完整原始操作载荷
+         */
+        record Unknown(String type, JsonNode raw) implements PatchChangeKind {}
+    }
+
+    /**
+     * 文件变更 Item 中包含的单个文件更新。
+     *
+     * @param path 目标文件路径
+     * @param kind 更新操作类型
+     * @param diff 统一差异格式的补丁内容
+     */
+    record FileUpdate(String path, PatchChangeKind kind, String diff) {}
+
+    /**
+     * 文件补丁的生命周期和变更列表。
+     *
+     * @param id Item ID
+     * @param changes 文件变更列表
+     * @param status 执行状态
+     * @param raw 完整原始 Item 载荷
+     */
     record FileChange(String id, List<FileUpdate> changes, String status, JsonNode raw)
             implements CodexItem {
         public FileChange {
@@ -239,7 +368,21 @@ public sealed interface CodexItem
         }
     }
 
-    /** MCP tool invocation and its structured or raw result. */
+    /**
+     * MCP 工具调用及其结构化或原始结果。
+     *
+     * @param id Item ID
+     * @param server MCP Server 名称
+     * @param tool 工具名称
+     * @param status 调用状态
+     * @param arguments 调用参数
+     * @param pluginId 可选的来源插件 ID
+     * @param readOnlyHint 工具是否声明为只读
+     * @param result 成功结果
+     * @param error 错误结果
+     * @param durationMs 调用耗时，单位为毫秒
+     * @param raw 完整原始 Item 载荷
+     */
     record McpToolCall(
             String id,
             String server,
@@ -259,7 +402,19 @@ public sealed interface CodexItem
         }
     }
 
-    /** Client-provided dynamic tool invocation. */
+    /**
+     * 客户端提供的动态工具调用。
+     *
+     * @param id Item ID
+     * @param namespace 可选的工具命名空间
+     * @param tool 工具名称
+     * @param status 调用状态
+     * @param arguments 调用参数
+     * @param contentItems 工具返回的内容项
+     * @param success 是否调用成功
+     * @param durationMs 调用耗时，单位为毫秒
+     * @param raw 完整原始 Item 载荷
+     */
     record DynamicToolCall(
             String id,
             String namespace,
@@ -281,7 +436,20 @@ public sealed interface CodexItem
         }
     }
 
-    /** Coordination call between a parent agent and one or more sub-agents. */
+    /**
+     * 父 Agent 与一个或多个子 Agent 之间的协作调用。
+     *
+     * @param id Item ID
+     * @param senderThreadId 发起调用的 Thread ID
+     * @param receiverThreadIds 接收调用的 Thread ID 列表
+     * @param tool 协作工具名称
+     * @param status 调用状态
+     * @param prompt 可选的提示内容
+     * @param model 可选的模型名称
+     * @param reasoningEffort 可选的推理强度
+     * @param agentsStates 子 Agent 状态
+     * @param raw 完整原始 Item 载荷
+     */
     record CollabAgentToolCall(
             String id,
             String senderThreadId,
@@ -304,7 +472,15 @@ public sealed interface CodexItem
         }
     }
 
-    /** Lifecycle marker emitted by a sub-agent. */
+    /**
+     * 子 Agent 发出的生命周期标记。
+     *
+     * @param id Item ID
+     * @param agentThreadId 子 Agent 的 Thread ID
+     * @param agentPath 子 Agent 路径
+     * @param kind 活动类型
+     * @param raw 完整原始 Item 载荷
+     */
     record SubAgentActivity(
             String id, String agentThreadId, String agentPath, String kind, JsonNode raw)
             implements CodexItem {
@@ -314,7 +490,15 @@ public sealed interface CodexItem
         }
     }
 
-    /** Web search request and result payload. */
+    /**
+     * Web 搜索请求及结果载荷。
+     *
+     * @param id Item ID
+     * @param query 可选的搜索文本
+     * @param action 搜索动作
+     * @param results 搜索结果
+     * @param raw 完整原始 Item 载荷
+     */
     record WebSearch(String id, String query, JsonNode action, JsonNode results, JsonNode raw)
             implements CodexItem {
         @Override
@@ -323,7 +507,13 @@ public sealed interface CodexItem
         }
     }
 
-    /** Local image inspected by the agent. */
+    /**
+     * Agent 查看过的本地图片。
+     *
+     * @param id Item ID
+     * @param path 图片路径
+     * @param raw 完整原始 Item 载荷
+     */
     record ImageView(String id, String path, JsonNode raw) implements CodexItem {
         @Override
         public String type() {
@@ -331,7 +521,13 @@ public sealed interface CodexItem
         }
     }
 
-    /** Deliberate agent sleep interval. */
+    /**
+     * Agent 主动等待的时间段。
+     *
+     * @param id Item ID
+     * @param durationMs 等待时长，单位为毫秒
+     * @param raw 完整原始 Item 载荷
+     */
     record Sleep(String id, long durationMs, JsonNode raw) implements CodexItem {
         @Override
         public String type() {
@@ -339,7 +535,18 @@ public sealed interface CodexItem
         }
     }
 
-    /** Image generation lifecycle and output. */
+    /**
+     * 图片生成的生命周期和输出。
+     *
+     * @param id Item ID
+     * @param status 生成状态
+     * @param result 生成结果
+     * @param revisedPrompt 可选的修订后提示词
+     * @param savedPath 可选的保存路径
+     * @param transparentBackground 是否使用透明背景
+     * @param failure 失败详情
+     * @param raw 完整原始 Item 载荷
+     */
     record ImageGeneration(
             String id,
             String status,
@@ -356,7 +563,13 @@ public sealed interface CodexItem
         }
     }
 
-    /** Agent entered review mode. */
+    /**
+     * Agent 已进入代码审查模式。
+     *
+     * @param id Item ID
+     * @param review 审查说明
+     * @param raw 完整原始 Item 载荷
+     */
     record EnteredReviewMode(String id, String review, JsonNode raw) implements CodexItem {
         @Override
         public String type() {
@@ -364,7 +577,13 @@ public sealed interface CodexItem
         }
     }
 
-    /** Agent exited review mode. */
+    /**
+     * Agent 已退出代码审查模式。
+     *
+     * @param id Item ID
+     * @param review 审查结果
+     * @param raw 完整原始 Item 载荷
+     */
     record ExitedReviewMode(String id, String review, JsonNode raw) implements CodexItem {
         @Override
         public String type() {
@@ -372,7 +591,12 @@ public sealed interface CodexItem
         }
     }
 
-    /** Thread context was compacted. */
+    /**
+     * Thread 上下文已完成压缩。
+     *
+     * @param id Item ID
+     * @param raw 完整原始 Item 载荷
+     */
     record ContextCompaction(String id, JsonNode raw) implements CodexItem {
         @Override
         public String type() {
@@ -380,10 +604,16 @@ public sealed interface CodexItem
         }
     }
 
-    /** Unknown or intentionally unexpanded item variant. */
+    /**
+     * 未知或有意保持原始形式的 Item 变体。
+     *
+     * @param id Item ID
+     * @param type app-server 实际发送的 Item 判别值
+     * @param raw 完整原始 Item 载荷
+     */
     record Unknown(String id, String type, JsonNode raw) implements CodexItem {}
 
-    /** Assistant message phase from the app-server protocol. */
+    /** app-server 协议定义的助手消息阶段。 */
     enum MessagePhase {
         COMMENTARY,
         FINAL_ANSWER,
@@ -438,11 +668,21 @@ public sealed interface CodexItem
         return List.copyOf(result);
     }
 
-    private static List<FileUpdate> fileChanges(JsonNode values) {
+    static List<FileUpdate> fileUpdates(JsonNode values) {
         if (!values.isArray()) return List.of();
         var result = new ArrayList<FileUpdate>();
         values.forEach(value -> result.add(new FileUpdate(
-                text(value, "path"), text(value, "kind"), text(value, "diff"))));
+                text(value, "path"), patchChangeKind(value.path("kind")), text(value, "diff"))));
         return List.copyOf(result);
+    }
+
+    private static PatchChangeKind patchChangeKind(JsonNode value) {
+        var type = text(value, "type");
+        return switch (type) {
+            case "add" -> new PatchChangeKind.Add();
+            case "delete" -> new PatchChangeKind.Delete();
+            case "update" -> new PatchChangeKind.Update(nullableText(value, "move_path"));
+            default -> new PatchChangeKind.Unknown(type, value);
+        };
     }
 }

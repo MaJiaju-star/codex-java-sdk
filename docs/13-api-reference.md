@@ -156,7 +156,7 @@ CodexClientConfig.builder()
 | 命令 | Windows 使用 `cmd.exe /d /c codex app-server`，其他平台使用 `codex app-server` |
 | clientName | `codex_java_sdk` |
 | clientTitle | `Codex Java SDK` |
-| clientVersion | `0.0.2-SNAPSHOT` |
+| clientVersion | `0.0.3-SNAPSHOT` |
 | experimentalApi | `true` |
 | requestTimeout | 60 秒 |
 | retryPolicy | 过载最多尝试 3 次，250 ms 起始指数退避 |
@@ -354,6 +354,19 @@ event.notification() // 已知通知的 sealed 强类型视图
 MCP 生命周期，以及 Goal、Skills、计划、diff、配置诊断等高频通知。未知方法返回
 `CodexNotification.Unknown`，原始参数仍可通过
 `raw()` 获取。
+
+公共通知契约为：
+
+```java
+CodexEventType type();
+String method();       // 已知通知由 type().method() 统一提供
+JsonNode raw();        // 保留完整原始参数和未来新增字段
+```
+
+`Delta` 除通用的 `threadId`、`turnId`、`itemId` 和 `delta` 外，还保留推理事件对应的
+`contentIndex` 与 `summaryIndex`。`Error.error()` 返回强类型 `TurnError`，不再要求调用方解析
+错误节点。文件更新的 `kind()` 返回 sealed `CodexItem.PatchChangeKind`，可区分 `Add`、
+`Delete`、带可选 `movePath` 的 `Update`，以及保留未知操作的 `Unknown`。
 
 已知枚举值：
 

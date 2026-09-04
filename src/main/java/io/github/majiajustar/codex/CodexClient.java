@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.majiajustar.codex.event.CodexEvent;
+import io.github.majiajustar.codex.event.CodexEventType;
 import io.github.majiajustar.codex.config.ConfigClient;
 import io.github.majiajustar.codex.exception.CodexException;
 import io.github.majiajustar.codex.exception.CodexTimeoutException;
@@ -407,7 +408,7 @@ public final class CodexClient implements AutoCloseable {
             var channel = turns.get(turnId);
             if (channel != null) {
                 channel.offer(event);
-                if (event.method().equals("turn/completed")) turns.remove(turnId);
+                if (event.type() == CodexEventType.TURN_COMPLETED) turns.remove(turnId);
                 return;
             }
             var early = earlyTurnEvents.computeIfAbsent(turnId, ignored -> new ArrayDeque<>());
@@ -422,7 +423,7 @@ public final class CodexClient implements AutoCloseable {
             var early = earlyTurnEvents.remove(turnId);
             if (early != null) early.forEach(channel::offer);
             var alreadyCompleted = early != null
-                    && early.stream().anyMatch(event -> event.method().equals("turn/completed"));
+                    && early.stream().anyMatch(event -> event.type() == CodexEventType.TURN_COMPLETED);
             if (!alreadyCompleted) turns.put(turnId, channel);
             return channel;
         }
