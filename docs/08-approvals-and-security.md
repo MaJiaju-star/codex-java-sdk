@@ -198,6 +198,33 @@ CodexClientConfig.builder()
 `declined` 时，即使没有独立错误对象也会返回 `false`。日志中应删除密钥、认证头、
 敏感文件内容和个人数据。
 
+### 4.1 多租户模型密钥
+
+模型 API Key 是 `CodexClient` 启动的 app-server 子进程环境变量，不能按 Thread 动态切换。
+不同用户不得共享一个 Client 后再通过不同 Thread 区分密钥。安全的最小隔离单元是：
+
+```text
+用户 = API Key + CodexClient/app-server + CODEX_HOME + 工作区
+```
+
+除了每用户独立进程，还应阻止工具命令继承模型密钥：
+
+```java
+CodexClientConfig.builder()
+        .environment("CODEX_HOME", userCodexHome.toString())
+        .openAiCompatibleProvider(internalProvider)
+        .apiKey(userApiKey)
+        .configOverride("shell_environment_policy.filters.OPENAI_API_KEY=\"exclude\"")
+        .build();
+```
+
+`OPENAI_API_KEY` 仍存在于 app-server 环境中供 Provider 使用，但不会传入 Codex 启动的 Shell
+命令。若使用其他密钥变量名，应显式排除对应名称。不要记录 `CodexClientConfig`、
+`environment()` 或子进程环境；密钥轮换后应重建对应 Client。
+
+工作区路径隔离只是范围约束，不代替身份鉴权。应用仍需验证 Thread/Turn 属于当前用户，并让
+后端根据用户身份解析工作区和 `CODEX_HOME`，不能信任浏览器直接提交的文件系统路径。
+
 ## 5. 原始处理器兼容入口
 
 原来的 `serverRequestHandler((method, params) -> ...)` 仍然可用。设置它时，SDK

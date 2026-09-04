@@ -12,13 +12,17 @@ SDK 有三个配置层级：
 
 ## 1. CodexClientConfig
 
-内网 OpenAI-compatible endpoint 和 API Key：
+内网 OpenAI-compatible endpoint 应注册成独立的强类型 Provider：
 
 ```java
+OpenAiCompatibleProviderConfig internal = OpenAiCompatibleProviderConfig.builder("internal")
+        .name("Internal Codex")
+        .baseUrl(URI.create("http://codex-api.internal/v1"))
+        .build();
+
 CodexClientConfig config = CodexClientConfig.builder()
-        .baseUrl("http://codex-api.internal/v1")
+        .openAiCompatibleProvider(internal)
         .apiKey(System.getenv("INTERNAL_CODEX_API_KEY"))
-        .modelProvider("internal")
         .model("gpt-internal")
         .modelReasoningEffort(CodexClientConfig.ReasoningEffort.HIGH)
         .webSearch(CodexClientConfig.WebSearchMode.DISABLED)
@@ -27,15 +31,98 @@ CodexClientConfig config = CodexClientConfig.builder()
         .build();
 ```
 
-`baseUrl` 会转换为 `--config openai_base_url=...`。原始覆盖项按照添加顺序放在它
-之前，因此显式的 `baseUrl` 具有更高优先级。API Key 只通过 app-server 子进程的
-`OPENAI_API_KEY` 环境变量传递，不会出现在命令行参数中。
+`openAiCompatibleProvider(...)` 会注册并选中 Provider，等价于以下 Codex 配置：
+
+```toml
+model_provider = "internal"
+
+[model_providers.internal]
+name = "Internal Codex"
+base_url = "http://codex-api.internal/v1"
+env_key = "OPENAI_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+```
+
+`apiKey(...)` 只通过 app-server 子进程的 `OPENAI_API_KEY` 环境变量传递，不会出现在
+命令行参数中。Provider 的 `env_key` 会让模型请求明确读取该变量；
+`requires_openai_auth = false` 会阻止这个 Provider 使用本机 `auth.json` 中的 ChatGPT
+登录凭据。因此，即使机器已经通过 Codex CLI 登录，该 Provider 的模型请求仍使用内网 API Key。
+
+不要只组合 `.baseUrl(...)` 和 `.apiKey(...)` 来隔离认证：`baseUrl` 仅覆盖内置 OpenAI
+Provider 的 `openai_base_url`，不会改变它选择认证来源的规则。若继续使用内置 Provider，
+app-server 仍可能采用本机持久化登录态。
+
+内网使用自定义环境变量名时，让 Provider 引用相同变量：
+
+```java
+OpenAiCompatibleProviderConfig internal = OpenAiCompatibleProviderConfig.builder("internal")
+        .baseUrl(URI.create("http://codex-api.internal/v1"))
+        .apiKeyEnvironmentVariable("INTERNAL_CODEX_API_KEY")
+        .build();
+
+CodexClientConfig config = CodexClientConfig.builder()
+        .environment("INTERNAL_CODEX_API_KEY", System.getenv("INTERNAL_CODEX_API_KEY"))
+        .openAiCompatibleProvider(internal)
+        .build();
+```
+
+### 多用户 API Key 与工作区隔离
+
+API Key 保存在 app-server 子进程环境中，因此它的作用域是整个 `CodexClient`，不是单个
+Thread 或 Turn。多个用户即使使用不同的 `ThreadOptions.workingDirectory(...)`，也不能安全地
+共享一个 `CodexClient`。推荐让每个用户拥有独立的 Client、`CODEX_HOME`、工作区和 API Key：
+
+```java
+Path userWorkspace = workspaceRoot.resolve(userId);
+Path userCodexHome = codexHomeRoot.resolve(userId);
+
+OpenAiCompatibleProviderConfig internal = OpenAiCompatibleProviderConfig.builder("internal")
+        .name("Internal Codex")
+        .baseUrl(URI.create("https://codex-api.internal/v1"))
+        .build();
+
+CodexClientConfig config = CodexClientConfig.builder()
+        .workingDirectory(userWorkspace)
+        .environment("CODEX_HOME", userCodexHome.toString())
+        .openAiCompatibleProvider(internal)
+        .apiKey(userApiKey)
+        .configOverride("shell_environment_policy.filters.OPENAI_API_KEY=\"exclude\"")
+        .build();
+
+CodexClient client = CodexClient.create(config);
+CodexThread thread = client.startThread(ThreadOptions.builder()
+        .workingDirectory(userWorkspace)
+        .sandbox(ThreadOptions.Sandbox.WORKSPACE_WRITE)
+        .build());
+```
+
+隔离要求：
+
+| 资源 | 推荐作用域 | 原因 |
+|---|---|---|
+| `CodexClient` / app-server | 每个用户一个 | 子进程环境中的 API Key 是进程级状态 |
+| API Key | 每个用户一个 | 计费、配额、审计和撤销互不影响 |
+| `CODEX_HOME` | 每个用户一个 | 隔离 Thread 历史、配置、缓存和其他本地状态 |
+| 工作区 | 每个用户一个 | 防止文件、Git 状态和命令执行相互影响 |
+| Thread | 用户内部按任务创建 | Thread 不是跨用户的安全边界 |
+
+同一用户可以在自己的 Client 中创建多个 Thread。API Key 轮换时，应关闭并重新创建该用户的
+Client。用户退出或长期空闲时也应关闭 Client，避免 app-server 进程无限增长。
+
+`apiKey(...)` 把密钥放入 app-server 环境，是为了让模型 Provider 读取它；但 Codex 执行的
+Shell 命令也可能继承父进程环境。上例显式排除了 `OPENAI_API_KEY`，模型请求仍能使用该密钥，
+工具启动的命令则看不到它。使用自定义密钥变量名时，应把过滤规则中的名称同步替换。
+
+不要记录 `CodexClientConfig` 或调用其 `toString()`：当前配置对象包含 `environment` Map，可能
+暴露密钥。用户 ID 和工作区路径必须由可信后端映射，不能直接采用前端提交的任意路径。
 
 常用全局配置均有具名 API：
 
 | Builder 方法 | Codex 配置键 |
 |---|---|
 | `baseUrl(String)` | `openai_base_url` |
+| `openAiCompatibleProvider(OpenAiCompatibleProviderConfig)` | `model_providers.<id>`，并选中 `model_provider` |
 | `modelProvider(String)` | `model_provider` |
 | `model(String)` | `model` |
 | `modelReasoningEffort(ReasoningEffort)` | `model_reasoning_effort` |
@@ -44,8 +131,10 @@ CodexClientConfig config = CodexClientConfig.builder()
 | `workspaceNetworkAccess(boolean)` | `sandbox_workspace_write.network_access` |
 | `mcpServer(String, McpServerConfig)` | `mcp_servers.<name>` |
 
-具名 API 会排在原始 `configOverride(s)` 后面，因此相同配置键以具名 API 为准。未提供
-具名方法的高级配置仍可通过 `configOverride("key=value")` 传递。
+具名 API 会排在原始 `configOverride(s)` 后面，因此相同配置键以具名 API 为准。
+`openAiCompatibleProvider(...)` 会把当前默认 `modelProvider` 设置成其 ID；如果随后调用
+`modelProvider(...)`，可以改选已经配置的其他 Provider。未提供具名方法的高级配置仍可通过
+`configOverride("key=value")` 传递。
 
 完整示例：
 

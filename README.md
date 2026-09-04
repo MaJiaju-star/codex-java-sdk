@@ -22,7 +22,7 @@ Solon Web SSE 完整示例：[多会话流式对话案例](examples/solon-sse-ch
 <dependency>
   <groupId>io.github.majiajustar</groupId>
   <artifactId>codex-java-sdk</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.2-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -99,13 +99,22 @@ try (CodexClient codex = CodexClient.create(config)) {
 
 ## 内网 API Key 配置
 
-使用内部 OpenAI-compatible 接口时，可以直接配置地址、API Key、模型和 Codex 配置项：
+使用内部 OpenAI-compatible 接口时，建议注册独立的强类型 Provider。SDK 会自动生成
+`env_key`、`wire_api = "responses"` 和 `requires_openai_auth = false`，避免模型请求误用本机已有的
+ChatGPT 登录态：
 
 ```java
+import io.github.majiajustar.codex.model.OpenAiCompatibleProviderConfig;
+import java.net.URI;
+
+OpenAiCompatibleProviderConfig internal = OpenAiCompatibleProviderConfig.builder("internal")
+        .name("Internal Codex")
+        .baseUrl(URI.create("http://codex-api.internal/v1"))
+        .build();
+
 CodexClientConfig config = CodexClientConfig.builder()
-        .baseUrl("http://codex-api.internal/v1")
+        .openAiCompatibleProvider(internal)
         .apiKey(System.getenv("INTERNAL_CODEX_API_KEY"))
-        .modelProvider("internal")
         .model("gpt-internal")
         .modelReasoningEffort(CodexClientConfig.ReasoningEffort.HIGH)
         .webSearch(CodexClientConfig.WebSearchMode.DISABLED)
@@ -115,7 +124,22 @@ CodexClientConfig config = CodexClientConfig.builder()
 ```
 
 `apiKey(...)` 只会通过 `OPENAI_API_KEY` 环境变量传递给 app-server 子进程，不会出现在命令行中。
-具名配置会覆盖相同的原始 `configOverride(...)` 配置项。
+`openAiCompatibleProvider(...)` 会自动选中注册的 Provider，生成的强类型配置会覆盖相同的原始
+`configOverride(...)` 配置项。
+
+若内网规定使用其他环境变量名，可以显式配置：
+
+```java
+OpenAiCompatibleProviderConfig internal = OpenAiCompatibleProviderConfig.builder("internal")
+        .baseUrl(URI.create("http://codex-api.internal/v1"))
+        .apiKeyEnvironmentVariable("INTERNAL_CODEX_API_KEY")
+        .build();
+
+CodexClientConfig config = CodexClientConfig.builder()
+        .environment("INTERNAL_CODEX_API_KEY", System.getenv("INTERNAL_CODEX_API_KEY"))
+        .openAiCompatibleProvider(internal)
+        .build();
+```
 
 ## 注册 MCP Server
 

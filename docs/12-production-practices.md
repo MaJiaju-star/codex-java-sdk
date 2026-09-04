@@ -169,6 +169,16 @@ ThreadOptions.builder()
 
 只有明确的写任务才升级到 `WORKSPACE_WRITE`，并使用隔离工作区与自定义审批处理器。
 
+内网模型服务还应隔离认证来源：使用 `openAiCompatibleProvider(...)` 注册
+`requires_openai_auth = false` 的独立 Provider，并通过它声明的环境变量注入 API Key。
+不要只覆盖内置 Provider 的 `baseUrl`；否则部署机器上残留的 Codex CLI 登录态仍可能成为
+模型请求的认证来源。配置示例见[第三章](03-configuration.md)。
+
+多用户服务必须按用户隔离 `CodexClient`、API Key、`CODEX_HOME` 和工作区。API Key 是
+app-server 进程级状态，Thread 不是密钥隔离边界。还应通过
+`shell_environment_policy.filters.<KEY_NAME>="exclude"` 禁止 Shell 工具继承模型密钥。
+密钥轮换时重建对应 Client，空闲 Client 应按策略回收。
+
 ## 11. 优雅关闭
 
 ```java
@@ -226,6 +236,9 @@ while ((line = reader.readLine()) != null) {
 - [ ] 真实 CLI smoke test 通过；
 - [ ] CLI 与 SDK 版本已记录；
 - [ ] 默认审批策略已显式评审；
+- [ ] 每个用户拥有独立的 Client、API Key、`CODEX_HOME` 和工作区；
+- [ ] 模型 API Key 已从 Shell 工具环境中排除；
+- [ ] Client 空闲回收和 API Key 轮换重建策略已经验证；
 - [ ] 审批 ID 已绑定用户、网页会话和 Codex Thread，且只能处理一次；
 - [ ] 待审批请求具有超时，关闭会话时会全部取消；
 - [ ] 工作区和本地路径已限制；

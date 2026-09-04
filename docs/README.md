@@ -45,6 +45,7 @@
 - 强类型命令/文件审批、工具前后拦截器和生命周期观察器；
 - 面向 Web UI 的跨平台命令事件、实时终端输出和异步人工审批案例；
 - MCP Server 强类型启动配置、状态查询、重新加载、OAuth、资源读取和工具调用；
+- OpenAI-compatible Provider 强类型注册，以及按用户隔离 Client、API Key、`CODEX_HOME` 和工作区；
 - Thread Goal、Skill 发现/启停，以及分层 Config 读写和管理员约束；
 - Goal、Skills、Thread 生命周期、计划、diff 和配置诊断等 WebIDE 高频通知；
 - 原始 JSON-RPC 入口，用于尚未添加便捷方法的 app-server API。

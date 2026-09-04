@@ -73,7 +73,7 @@ mvn clean install
 <dependency>
   <groupId>io.github.majiajustar</groupId>
   <artifactId>codex-java-sdk</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.2-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -120,17 +120,31 @@ CodexClientConfig config = CodexClientConfig.builder()
 
 ## 5. 认证准备
 
-Java SDK 会复用 Codex CLI 已有的认证状态。最简单的方式是在终端中先完成登录，然后再启动 Java 应用。
+默认使用内置 OpenAI Provider 时，Java SDK 会复用 Codex CLI 已有的认证状态。最简单的方式是在
+终端中先完成登录，然后再启动 Java 应用。
 
-认证数据通常由 Codex CLI 管理，SDK 不会读取或打印 API Key。需要通过环境变量向子进程提供额外认证配置时，可使用：
+如果应用连接内网 OpenAI-compatible 服务，不应依赖本机登录态，也不要认为单独设置
+`OPENAI_API_KEY` 必然覆盖 `auth.json`。应注册一个明确从环境变量读取密钥、且不要求 OpenAI
+登录的 Provider：
 
 ```java
+OpenAiCompatibleProviderConfig internal = OpenAiCompatibleProviderConfig.builder("internal")
+        .name("Internal Codex")
+        .baseUrl(URI.create("https://codex-api.internal/v1"))
+        .build();
+
 CodexClientConfig config = CodexClientConfig.builder()
-        .environment("OPENAI_API_KEY", System.getenv("OPENAI_API_KEY"))
+        .openAiCompatibleProvider(internal)
+        .apiKey(System.getenv("INTERNAL_CODEX_API_KEY"))
         .build();
 ```
 
-不要把密钥直接写入源码、日志或提交到版本库。生产环境应从密钥管理系统注入环境变量。
+该 API 固定生成 `wire_api = "responses"`、`env_key = "OPENAI_API_KEY"` 和
+`requires_openai_auth = false`。本机登录态仍可供其他账户相关能力使用，但不会参与这个
+Provider 的模型请求认证。完整配置、定制环境变量名和优先级见[第三章](03-configuration.md)。
+
+SDK 不会读取或打印 API Key。不要把密钥直接写入源码、日志或提交到版本库；生产环境应从
+密钥管理系统注入。
 
 ## 6. 验证连接
 

@@ -9,7 +9,9 @@ import io.github.majiajustar.codex.tool.ToolInterceptor;
 import io.github.majiajustar.codex.tool.ToolObserver;
 import io.github.majiajustar.codex.internal.JsonSupport;
 import io.github.majiajustar.codex.internal.McpConfigOverrideSerializer;
+import io.github.majiajustar.codex.internal.ModelProviderConfigOverrideSerializer;
 import io.github.majiajustar.codex.mcp.McpServerConfig;
+import io.github.majiajustar.codex.model.OpenAiCompatibleProviderConfig;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -135,6 +137,8 @@ public record CodexClientConfig(
         private final Map<String, String> environment = new LinkedHashMap<>();
         private final List<String> configOverrides = new ArrayList<>();
         private final Map<String, McpServerConfig> mcpServers = new LinkedHashMap<>();
+        private final Map<String, OpenAiCompatibleProviderConfig> openAiCompatibleProviders =
+                new LinkedHashMap<>();
         private String baseUrl;
         private String model;
         private String modelProvider;
@@ -144,7 +148,7 @@ public record CodexClientConfig(
         private Boolean workspaceNetworkAccess;
         private String clientName = "codex_java_sdk";
         private String clientTitle = "Codex Java SDK";
-        private String clientVersion = "0.0.1-SNAPSHOT";
+        private String clientVersion = "0.0.2-SNAPSHOT";
         private boolean experimentalApi = true;
         private Duration requestTimeout = Duration.ofSeconds(60);
         private BiFunction<String, JsonNode, JsonNode> serverRequestHandler =
@@ -178,7 +182,7 @@ public record CodexClientConfig(
             return this;
         }
 
-        /** Configure an OpenAI-compatible API base URL for the app-server process. */
+        /** 设置内置 OpenAI 提供方的 API 地址；自定义服务优先使用 {@link #openAiCompatibleProvider}。 */
         public Builder baseUrl(String value) {
             baseUrl = Objects.requireNonNull(value, "value");
             return this;
@@ -220,7 +224,11 @@ public record CodexClientConfig(
             return this;
         }
 
-        /** Configure API-key authentication without requiring an interactive login. */
+        /**
+         * 通过 {@code OPENAI_API_KEY} 向子进程传递 API Key。
+         *
+         * <p>若要确保不使用本机登录态，请同时注册 {@link #openAiCompatibleProvider}。
+         */
         public Builder apiKey(String value) {
             environment.put("OPENAI_API_KEY", Objects.requireNonNull(value, "value"));
             return this;
@@ -235,6 +243,19 @@ public record CodexClientConfig(
         /** Append raw Codex CLI {@code --config key=value} overrides in precedence order. */
         public Builder configOverrides(List<String> values) {
             values.forEach(this::configOverride);
+            return this;
+        }
+
+        /**
+         * 注册并选中一个 OpenAI-compatible 模型提供方。
+         *
+         * <p>SDK 会固定使用 Responses API、关闭 OpenAI 登录态认证，并让 Codex 从配置指定的环境变量读取
+         * API Key。同 ID 配置以后一次为准。
+         */
+        public Builder openAiCompatibleProvider(OpenAiCompatibleProviderConfig config) {
+            Objects.requireNonNull(config, "config");
+            openAiCompatibleProviders.put(config.id(), config);
+            modelProvider = config.id();
             return this;
         }
 
@@ -331,6 +352,8 @@ public record CodexClientConfig(
                 resolvedOverrides.add(
                         "sandbox_workspace_write.network_access=" + workspaceNetworkAccess);
             }
+            openAiCompatibleProviders.values().forEach(config -> resolvedOverrides.add(
+                    ModelProviderConfigOverrideSerializer.serialize(config)));
             mcpServers.forEach((name, config) ->
                     resolvedOverrides.add(McpConfigOverrideSerializer.serialize(name, config)));
             return new CodexClientConfig(

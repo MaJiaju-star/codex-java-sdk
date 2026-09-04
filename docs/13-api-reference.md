@@ -127,6 +127,7 @@ CodexClientConfig.builder()
     .environment(String name, String value)
     .baseUrl(String)
     .apiKey(String)
+    .openAiCompatibleProvider(OpenAiCompatibleProviderConfig)
     .modelProvider(String)
     .model(String)
     .modelReasoningEffort(CodexClientConfig.ReasoningEffort)
@@ -155,11 +156,29 @@ CodexClientConfig.builder()
 | 命令 | Windows 使用 `cmd.exe /d /c codex app-server`，其他平台使用 `codex app-server` |
 | clientName | `codex_java_sdk` |
 | clientTitle | `Codex Java SDK` |
-| clientVersion | `0.0.1-SNAPSHOT` |
+| clientVersion | `0.0.2-SNAPSHOT` |
 | experimentalApi | `true` |
 | requestTimeout | 60 秒 |
 | retryPolicy | 过载最多尝试 3 次，250 ms 起始指数退避 |
 | 审批处理器 | 接受命令执行和文件修改审批 |
+
+### OpenAI-compatible Provider
+
+```java
+OpenAiCompatibleProviderConfig.builder(String id)
+    .name(String)
+    .baseUrl(URI)
+    .apiKeyEnvironmentVariable(String)
+    .build()
+```
+
+`name` 默认等于 `id`，API Key 环境变量默认是 `OPENAI_API_KEY`。Provider 固定使用
+Responses API，并生成 `requires_openai_auth = false`。将它传给
+`CodexClientConfig.Builder.openAiCompatibleProvider(...)` 后会同时注册并选中该 Provider。
+
+Provider ID 只能包含字母、数字、下划线和连字符；`baseUrl` 必须是绝对 HTTP(S) URI；
+环境变量名称必须符合常规环境变量标识符格式。密钥值应通过 `apiKey(...)` 或
+`environment(...)` 注入，不属于 `OpenAiCompatibleProviderConfig`，也不会写入命令行。
 
 ### MCP 配置
 
