@@ -49,6 +49,8 @@ import io.github.majiajustar.codex.generated.v2.ThreadSortKey;
 import io.github.majiajustar.codex.generated.v2.ThreadStatus;
 import io.github.majiajustar.codex.generated.v2.ThreadStatusType;
 import io.github.majiajustar.codex.generated.v2.ThreadUnarchiveResponse;
+import io.github.majiajustar.codex.generated.v2.TurnItemsView;
+import io.github.majiajustar.codex.generated.v2.TurnStatus;
 import org.junit.jupiter.api.Test;
 
 class CodexClientIntegrationTest {
@@ -273,6 +275,35 @@ class CodexClientIntegrationTest {
             assertEquals(expectedPage, codex.listThreads(options));
             assertEquals(new ThreadArchiveResponse(), codex.archiveThread("thread-1"));
             assertEquals(new ThreadUnarchiveResponse(thread), codex.unarchiveThread("thread-1"));
+        }
+    }
+
+    @Test
+    void readsStronglyTypedThreadHistory() {
+        var config = CodexClientConfig.builder()
+                .command(mockServerCommand())
+                .requestTimeout(Duration.ofSeconds(10))
+                .build();
+
+        try (var codex = CodexClient.create(config)) {
+            var history = codex.resumeThread("thread-1").readHistory();
+
+            assertEquals("thread-1", history.id());
+            assertEquals("SDK history", history.name());
+            assertEquals("gpt-test", history.model());
+            assertEquals(1, history.turns().size());
+            var turn = history.turns().getFirst();
+            assertEquals("turn-history-1", turn.id());
+            assertEquals(TurnStatus.COMPLETED, turn.status());
+            assertEquals(TurnItemsView.FULL, turn.itemsView());
+            assertEquals(2, turn.items().size());
+            assertEquals("检查项目", ((CodexItem.UserMessage) turn.items().getFirst())
+                    .content()
+                    .getFirst()
+                    .path("text")
+                    .asText());
+            assertEquals("检查完成", ((CodexItem.AgentMessage) turn.items().getLast()).text());
+            assertEquals("thread-1", history.raw().path("thread").path("id").asText());
         }
     }
 

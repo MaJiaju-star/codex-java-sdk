@@ -37,6 +37,11 @@ public final class MockAppServer {
                         result.put("nextCursor", "next-page");
                         reply(out, message, result);
                     }
+                    case "thread/read" -> {
+                        var result = JSON.createObjectNode();
+                        result.set("thread", threadHistory());
+                        reply(out, message, result);
+                    }
                     case "thread/archive" -> reply(out, message, JSON.createObjectNode());
                     case "thread/unarchive" -> {
                         var result = JSON.createObjectNode();
@@ -335,6 +340,33 @@ public final class MockAppServer {
                 .put("ephemeral", false);
         thread.set("status", JSON.createObjectNode().put("type", "idle"));
         thread.putArray("turns");
+        return thread;
+    }
+
+    private static ObjectNode threadHistory() {
+        var thread = thread()
+                .put("name", "SDK history")
+                .put("model", "gpt-test")
+                .put("historyMode", "paginated");
+        var userMessage = JSON.createObjectNode()
+                .put("id", "user-1")
+                .put("type", "userMessage");
+        userMessage.putArray("content")
+                .add(JSON.createObjectNode().put("type", "text").put("text", "检查项目"));
+        var agentMessage = JSON.createObjectNode()
+                .put("id", "agent-1")
+                .put("type", "agentMessage")
+                .put("phase", "final_answer")
+                .put("text", "检查完成");
+        var turn = JSON.createObjectNode()
+                .put("id", "turn-history-1")
+                .put("status", "completed")
+                .put("startedAt", 10)
+                .put("completedAt", 12)
+                .put("durationMs", 2000)
+                .put("itemsView", "full");
+        turn.putArray("items").add(userMessage).add(agentMessage);
+        thread.putArray("turns").add(turn);
         return thread;
     }
 

@@ -156,7 +156,7 @@ CodexClientConfig.builder()
 | 命令 | Windows 使用 `cmd.exe /d /c codex app-server`，其他平台使用 `codex app-server` |
 | clientName | `codex_java_sdk` |
 | clientTitle | `Codex Java SDK` |
-| clientVersion | `0.0.3-SNAPSHOT` |
+| clientVersion | `0.0.4-SNAPSHOT` |
 | experimentalApi | `true` |
 | requestTimeout | 60 秒 |
 | retryPolicy | 过载最多尝试 3 次，250 ms 起始指数退避 |
@@ -271,12 +271,16 @@ CodexTurn startTurn(
 Thread 操作：
 
 ```java
+ThreadHistory readHistory()
 JsonNode read(boolean includeTurns)
 void setName(String name)
 void compact()
 ThreadArchiveResponse archive()
 ThreadUnarchiveResponse unarchive()
 ```
+
+`readHistory()` 返回强类型 Thread 元数据和 `List<ThreadHistory.Turn>`；每个 Turn 的
+`items()` 是 `List<CodexItem>`。`read(boolean)` 是保留的原始 JSON 接口。
 
 ## 5. TurnOptions
 

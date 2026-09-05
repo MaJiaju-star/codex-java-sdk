@@ -22,7 +22,7 @@ Solon Web SSE 完整示例：[多会话流式对话案例](examples/solon-sse-ch
 <dependency>
   <groupId>io.github.majiajustar</groupId>
   <artifactId>codex-java-sdk</artifactId>
-  <version>0.0.3-SNAPSHOT</version>
+  <version>0.0.4-SNAPSHOT</version>
 </dependency>
 ```
 

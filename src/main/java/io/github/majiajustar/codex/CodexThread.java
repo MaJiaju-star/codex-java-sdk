@@ -5,6 +5,7 @@ import io.github.majiajustar.codex.generated.v2.ThreadArchiveResponse;
 import io.github.majiajustar.codex.generated.v2.ThreadUnarchiveResponse;
 import io.github.majiajustar.codex.goal.ThreadGoals;
 import io.github.majiajustar.codex.internal.JsonSupport;
+import io.github.majiajustar.codex.thread.ThreadHistory;
 import io.github.majiajustar.codex.thread.ThreadOptions;
 import io.github.majiajustar.codex.turn.TurnOptions;
 import io.github.majiajustar.codex.turn.TurnResult;
@@ -100,6 +101,18 @@ public final class CodexThread {
         return client.request("thread/read", JsonSupport.MAPPER.createObjectNode()
                 .put("threadId", id)
                 .put("includeTurns", includeTurns));
+    }
+
+    /**
+     * 读取并解析当前会话的持久化历史。
+     *
+     * <p>返回的轮次包含强类型 {@code CodexItem}；完整原始载荷仍保留在各级 {@code raw()}
+     * 中，以兼容新版 app-server 字段。
+     *
+     * @return 强类型会话历史
+     */
+    public ThreadHistory readHistory() {
+        return ThreadHistory.fromResponse(read(true));
     }
 
     /** 为该会话设置用户可见的名称。 */

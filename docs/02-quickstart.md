@@ -34,7 +34,7 @@ codex-java-demo/
     <dependency>
       <groupId>io.github.majiajustar</groupId>
       <artifactId>codex-java-sdk</artifactId>
-      <version>0.0.3-SNAPSHOT</version>
+      <version>0.0.4-SNAPSHOT</version>
     </dependency>
   </dependencies>
 </project>
