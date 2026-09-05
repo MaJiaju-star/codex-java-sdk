@@ -3,6 +3,7 @@ package io.github.majiajustar.codex.integration;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,12 +17,16 @@ import io.github.majiajustar.codex.event.CodexEvent;
 import io.github.majiajustar.codex.event.CodexEventType;
 import io.github.majiajustar.codex.event.CodexItem;
 import io.github.majiajustar.codex.event.CodexNotification;
+import io.github.majiajustar.codex.exception.CodexTransportException;
 import io.github.majiajustar.codex.exception.InvalidParamsException;
+import io.github.majiajustar.codex.exception.InvalidRequestException;
 import io.github.majiajustar.codex.exception.JsonRpcException;
+import io.github.majiajustar.codex.exception.MethodNotFoundException;
 import io.github.majiajustar.codex.internal.JsonSupport;
 import io.github.majiajustar.codex.sandbox.SandboxPolicy;
 import io.github.majiajustar.codex.thread.ThreadListOptions;
 import io.github.majiajustar.codex.thread.ThreadOptions;
+import io.github.majiajustar.codex.thread.ThreadTurnsListOptions;
 import io.github.majiajustar.codex.tool.ApprovalHandler;
 import io.github.majiajustar.codex.tool.ApprovalRequest;
 import io.github.majiajustar.codex.tool.ToolCallContext;
@@ -279,31 +284,100 @@ class CodexClientIntegrationTest {
     }
 
     @Test
-    void readsStronglyTypedThreadHistory() {
-        var config = CodexClientConfig.builder()
-                .command(mockServerCommand())
-                .requestTimeout(Duration.ofSeconds(10))
-                .build();
-
-        try (var codex = CodexClient.create(config)) {
+    void readsPaginatedThreadHistoryInAscendingOrderWithFullItems() {
+        try (var codex = CodexClient.create(mockConfig())) {
             var history = codex.resumeThread("thread-1").readHistory();
 
             assertEquals("thread-1", history.id());
             assertEquals("SDK history", history.name());
             assertEquals("gpt-test", history.model());
-            assertEquals(1, history.turns().size());
-            var turn = history.turns().getFirst();
-            assertEquals("turn-history-1", turn.id());
-            assertEquals(TurnStatus.COMPLETED, turn.status());
-            assertEquals(TurnItemsView.FULL, turn.itemsView());
-            assertEquals(2, turn.items().size());
-            assertEquals("检查项目", ((CodexItem.UserMessage) turn.items().getFirst())
+            assertEquals(2, history.turns().size());
+            assertEquals(
+                    List.of("turn-history-1", "turn-history-2"),
+                    history.turns().stream().map(turn -> turn.id()).toList());
+            var firstTurn = history.turns().getFirst();
+            assertEquals(TurnStatus.COMPLETED, firstTurn.status());
+            assertEquals(TurnItemsView.FULL, firstTurn.itemsView());
+            assertEquals("检查项目", ((CodexItem.UserMessage) firstTurn.items().getFirst())
                     .content()
                     .getFirst()
                     .path("text")
                     .asText());
-            assertEquals("检查完成", ((CodexItem.AgentMessage) turn.items().getLast()).text());
+            var secondTurn = history.turns().getLast();
+            assertEquals("检查完成", ((CodexItem.AgentMessage) secondTurn.items().getFirst()).text());
+            var unknown = assertInstanceOf(CodexItem.Unknown.class, secondTurn.items().getLast());
+            assertTrue(unknown.raw().path("futureField").asBoolean());
             assertEquals("thread-1", history.raw().path("thread").path("id").asText());
+            assertEquals(2, history.raw().path("thread").path("turns").size());
+        }
+    }
+
+    @Test
+    void listsOneStronglyTypedTurnPage() {
+        try (var codex = CodexClient.create(mockConfig())) {
+            var page = codex.resumeThread("thread-1").listTurns(ThreadTurnsListOptions.builder()
+                    .limit(100)
+                    .sortDirection(SortDirection.ASC)
+                    .itemsView(TurnItemsView.FULL)
+                    .build());
+
+            assertEquals(List.of("turn-history-1"),
+                    page.data().stream().map(turn -> turn.id()).toList());
+            assertEquals("page-2", page.nextCursor());
+            assertEquals("backwards-1", page.backwardsCursor());
+            assertTrue(page.raw().path("futurePageField").asBoolean());
+        }
+    }
+
+    @Test
+    void readsLegacyThreadHistoryWithThreadRead() {
+        try (var codex = CodexClient.create(mockConfig())) {
+            var history = codex.resumeThread("legacy-thread").readHistory();
+
+            assertEquals("legacy-thread", history.id());
+            assertEquals(List.of("legacy-turn"),
+                    history.turns().stream().map(turn -> turn.id()).toList());
+            assertEquals("旧会话完成", ((CodexItem.AgentMessage)
+                            history.turns().getFirst().items().getLast())
+                    .text());
+        }
+    }
+
+    @Test
+    void fallsBackToPaginationWhenHistoryModeIsMissing() {
+        try (var codex = CodexClient.create(mockConfig())) {
+            var history = codex.resumeThread("fallback-thread").readHistory();
+
+            assertEquals("fallback-thread", history.id());
+            assertNull(history.historyMode());
+            assertEquals(2, history.turns().size());
+        }
+    }
+
+    @Test
+    void doesNotSwallowUnrelatedInvalidHistoryRequest() {
+        try (var codex = CodexClient.create(mockConfig())) {
+            var thread = codex.resumeThread("invalid-history-thread");
+            var error = assertThrows(InvalidRequestException.class, thread::readHistory);
+            assertEquals("unrelated invalid history request", error.rpcMessage());
+        }
+    }
+
+    @Test
+    void rejectsRepeatedTurnPaginationCursor() {
+        try (var codex = CodexClient.create(mockConfig())) {
+            var thread = codex.resumeThread("repeated-cursor-thread");
+            var error = assertThrows(CodexTransportException.class, thread::readHistory);
+            assertTrue(error.getMessage().contains("repeated cursor"));
+        }
+    }
+
+    @Test
+    void preservesMethodNotFoundWhenPaginationIsUnsupported() {
+        try (var codex = CodexClient.create(mockConfig())) {
+            var thread = codex.resumeThread("unsupported-pagination-thread");
+            var error = assertThrows(MethodNotFoundException.class, thread::readHistory);
+            assertEquals("unknown method thread/turns/list", error.rpcMessage());
         }
     }
 
@@ -552,6 +626,13 @@ class CodexClientIntegrationTest {
     private static List<String> mockServerCommand() {
         var java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         return List.of(java, "-cp", System.getProperty("java.class.path"), MockAppServer.class.getName());
+    }
+
+    private static CodexClientConfig mockConfig() {
+        return CodexClientConfig.builder()
+                .command(mockServerCommand())
+                .requestTimeout(Duration.ofSeconds(10))
+                .build();
     }
 
     private record ToolCompletion(boolean successful, String error, String status) {}

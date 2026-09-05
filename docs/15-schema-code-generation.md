@@ -134,6 +134,10 @@ for (io.github.majiajustar.codex.generated.v2.Thread thread : page.data()) {
 }
 ```
 
+`ThreadTurnsListParams` 和 `ThreadTurnsListResponse` 也由 `0.153.0` Schema 生成。SDK 在其上
+提供 `ThreadTurnsListOptions` 与 `ThreadTurnsPage`，负责把协议中的原始 Turn Item 转换为
+`CodexItem` 强类型，同时保留原始载荷。
+
 枚举通过 `wireValue()` 暴露协议值。例如
 `ThreadSortKey.RECENCY_AT.wireValue()` 是 `recency_at`，而不是 Java 常量名。
 

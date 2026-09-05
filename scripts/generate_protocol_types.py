@@ -45,6 +45,8 @@ RECORD_TARGETS = {
     "ThreadArchiveResponse": ("ThreadArchiveResponse", "root"),
     "ThreadListParams": ("ThreadListParams", "root"),
     "ThreadListResponse": ("ThreadListResponse", "root"),
+    "ThreadTurnsListParams": ("ThreadTurnsListParams", "root"),
+    "ThreadTurnsListResponse": ("ThreadTurnsListResponse", "root"),
     "ThreadUnarchiveParams": ("ThreadUnarchiveParams", "root"),
     "ThreadUnarchiveResponse": ("ThreadUnarchiveResponse", "root"),
     "Turn": ("ThreadListResponse", "definition"),
@@ -75,6 +77,8 @@ TYPE_DESCRIPTIONS = {
     "ThreadArchiveResponse": "归档会话请求的响应。",
     "ThreadListParams": "查询会话列表时使用的过滤和分页参数。",
     "ThreadListResponse": "一页会话列表及其分页游标。",
+    "ThreadTurnsListParams": "分页读取指定会话 Turn 历史的请求参数。",
+    "ThreadTurnsListResponse": "一页会话 Turn 历史及其分页游标。",
     "ThreadSortKey": "会话列表使用的排序字段。",
     "ThreadSourceKind": "会话的来源类别。",
     "ThreadStartSource": "新会话的启动来源。",
@@ -154,6 +158,20 @@ FIELD_DESCRIPTIONS = {
         ),
         "data": "当前页的会话数据。",
         "nextCursor": "下一次调用使用的不透明游标；为 null 时表示没有更多数据。",
+    },
+    "ThreadTurnsListParams": {
+        "threadId": "需要读取 Turn 历史的会话 ID。",
+        "cursor": "上一次调用返回的不透明分页游标。",
+        "limit": "可选页大小；app-server 0.153.0 最大支持 100。",
+        "sortDirection": "可选排序方向；省略时默认按降序排列。",
+        "itemsView": "每个 Turn 返回的 Item 详情范围；省略时默认为摘要。",
+    },
+    "ThreadTurnsListResponse": {
+        "data": "当前页的 Turn 数据。",
+        "nextCursor": "下一次调用使用的不透明游标；为 null 时表示没有更多 Turn。",
+        "backwardsCursor": (
+            "反转 sortDirection 后可作为 cursor 使用的不透明游标；页面非空时提供。"
+        ),
     },
     "ThreadUnarchiveParams": {
         "threadId": "需要取消归档的会话 ID。",

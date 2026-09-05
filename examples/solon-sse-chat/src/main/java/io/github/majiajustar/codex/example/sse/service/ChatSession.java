@@ -72,7 +72,7 @@ final class ChatSession implements AutoCloseable {
     }
 
     HistoryView history() {
-        return ThreadHistoryMapper.map(id, thread.id(), thread.read(true));
+        return ThreadHistoryMapper.map(id, thread.id(), thread.readHistory().raw());
     }
 
     synchronized TurnAccepted send(SendMessageRequest request) {

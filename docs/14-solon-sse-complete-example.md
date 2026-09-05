@@ -122,7 +122,7 @@ solon-sse-chat/
 | `CodexSessionService` | 维护所有网页会话，共享一个 `CodexClient` |
 | `ChatSession` | 持有一个 Codex Thread、活动 Turn、SSE 通道和目录监听器 |
 | `SseChannel` | 事件序列化、广播、心跳及最近 500 条回放 |
-| `ThreadHistoryMapper` | 将 `thread/read` 原始结果转换成有界、稳定的浏览器历史 DTO |
+| `ThreadHistoryMapper` | 将 `readHistory()` 自动聚合的普通或分页历史转换成有界、稳定的浏览器 DTO |
 | `BashCommandMonitor` | 对 PowerShell、CMD、Bash 等命令做尽力分类并提取疑似路径；名称为历史遗留 |
 | `WorkspaceWatcher` | 使用 `WatchService` 递归监听真实文件系统变化 |
 | `index.html` | 会话列表、聊天区、工具/目录/原始事件面板 |
@@ -168,7 +168,7 @@ solon-sse-chat/
   <dependency>
     <groupId>io.github.majiajustar</groupId>
     <artifactId>codex-java-sdk</artifactId>
-    <version>0.0.4-SNAPSHOT</version>
+    <version>0.0.5-SNAPSHOT</version>
   </dependency>
 </dependencies>
 ```
@@ -831,7 +831,8 @@ Invoke-RestMethod `
 2. **审批策略**：保留案例的会话归属校验，并在人工审批前增加服务端命令、路径策略；
 3. **资源配额**：限制用户会话数、并发 Turn、执行时长、SSE 连接数和输出大小；
 4. **持久状态**：保存网页会话与 Thread ID 的映射；
-5. **历史分页**：案例一次读取全部可用 Turn，长会话应提供游标分页和响应大小上限；
+5. **历史分页**：案例通过 `readHistory()` 一次聚合全部可用 Turn；长会话应改用
+   `listTurns(...)` 向浏览器分页，并设置响应大小上限；
 6. **分布式事件**：多实例部署时使用外部消息系统，不依赖本机 Map；
 7. **可靠续传**：支持 SSE `id` 与 `Last-Event-ID`；
 8. **反向代理**：关闭 SSE 响应缓冲，设置合理的空闲超时；

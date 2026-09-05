@@ -154,10 +154,15 @@ for (ThreadHistory.Turn turn : history.turns()) {
 }
 ```
 
-`readHistory()` 会读取完整可用 Turn 历史，并将 Item 转换为 `CodexItem.UserMessage`、
-`CodexItem.AgentMessage`、`CodexItem.CommandExecution`、`CodexItem.FileChange`、
-`CodexItem.McpToolCall` 等强类型。未知 Item 会转换为 `CodexItem.Unknown`，完整协议字段可
-通过 `history.raw()`、`turn.raw()` 和 `item.raw()` 获取。
+`readHistory()` 会先读取 Thread 元数据，再根据 `historyMode` 自动选择读取策略：普通
+历史使用 `thread/read(includeTurns=true)`，分页历史使用 `thread/turns/list`。如果旧版
+app-server 未返回 `historyMode`，但普通读取返回明确的分页历史错误，SDK 也会自动回退到
+分页读取。分页固定按时间正序请求完整 Item，直到 `nextCursor=null`。
+
+每个 Item 会转换为 `CodexItem.UserMessage`、`CodexItem.AgentMessage`、
+`CodexItem.CommandExecution`、`CodexItem.FileChange`、`CodexItem.McpToolCall` 等强类型。
+未知 Item 会转换为 `CodexItem.Unknown`，完整协议字段可通过 `history.raw()`、
+`turn.raw()` 和 `item.raw()` 获取。
 
 应用重启后，如果只保存了 Thread ID，可以先恢复句柄再读取：
 
@@ -167,6 +172,25 @@ ThreadHistory history = resumed.readHistory();
 ```
 
 原始 JSON 接口继续保留，适合尚未建模的新协议字段或只读取元数据的场景。
+
+需要由界面自行控制分页时，可直接读取一页 Turn：
+
+```java
+ThreadTurnsPage page = thread.listTurns(ThreadTurnsListOptions.builder()
+        .limit(100)
+        .sortDirection(SortDirection.ASC)
+        .itemsView(TurnItemsView.FULL)
+        .build());
+
+for (ThreadHistory.Turn turn : page.data()) {
+    System.out.println(turn.id());
+}
+
+String nextCursor = page.nextCursor();
+```
+
+继续读取下一页时，将 `nextCursor` 传入 `.cursor(...)`。`limit` 的有效范围是 1 至 100；
+省略排序方向时 app-server 默认按降序返回，省略 `itemsView` 时默认只返回摘要。
 
 只读 Thread 元数据：
 
@@ -178,7 +202,7 @@ System.out.println("ID: " + threadData.path("id").asText());
 System.out.println("Status: " + threadData.path("status"));
 ```
 
-读取原始 Turn 历史：
+读取原始 Turn 历史仅适合明确使用旧式历史的场景：
 
 ```java
 JsonNode response = thread.read(true);
@@ -187,10 +211,12 @@ for (JsonNode turn : response.path("thread").path("turns")) {
 }
 ```
 
-历史可能较大。只需检查状态或元数据时使用 `includeTurns=false`。
+分页 Thread 不应直接使用 `read(true)`；部分 app-server 版本会返回 `-32600`，其他版本也
+可能只提供已弃用的兼容行为。一般业务代码应使用 `readHistory()` 或 `listTurns(...)`。
+历史可能较大，只需检查状态或元数据时使用 `includeTurns=false`。
 
-`thread.readHistory()` 和 `thread.read(true)` 返回的是 app-server 当前可读取的持久
-Thread 历史，不应直接等同于“模型此刻看到的全部记忆”。长会话可能经过压缩，不同
+`thread.readHistory()` 返回的是 app-server 在分页期间可读取的持久 Thread 历史，不应
+直接等同于“模型此刻看到的全部记忆”。长会话可能经过压缩，不同
 历史模式或 CLI 版本能够还原的工具 Item 也可能不同；模型还可能拥有未作为普通聊天
 消息展示的指令和上下文。
 

@@ -26,9 +26,15 @@ public final class MockAppServer {
                     case "initialize" -> reply(out, message, JSON.createObjectNode()
                             .put("userAgent", "mock-codex")
                             .put("platformFamily", "test"));
-                    case "thread/start", "thread/resume", "thread/fork" -> {
+                    case "thread/start", "thread/fork" -> {
                         var result = JSON.createObjectNode();
                         result.putObject("thread").put("id", "thread-1");
+                        reply(out, message, result);
+                    }
+                    case "thread/resume" -> {
+                        var result = JSON.createObjectNode();
+                        result.putObject("thread")
+                                .put("id", message.path("params").path("threadId").asText("thread-1"));
                         reply(out, message, result);
                     }
                     case "thread/list" -> {
@@ -37,11 +43,8 @@ public final class MockAppServer {
                         result.put("nextCursor", "next-page");
                         reply(out, message, result);
                     }
-                    case "thread/read" -> {
-                        var result = JSON.createObjectNode();
-                        result.set("thread", threadHistory());
-                        reply(out, message, result);
-                    }
+                    case "thread/read" -> readThread(out, message);
+                    case "thread/turns/list" -> listThreadTurns(out, message);
                     case "thread/archive" -> reply(out, message, JSON.createObjectNode());
                     case "thread/unarchive" -> {
                         var result = JSON.createObjectNode();
@@ -324,9 +327,13 @@ public final class MockAppServer {
     }
 
     private static ObjectNode thread() {
+        return thread("thread-1");
+    }
+
+    private static ObjectNode thread(String threadId) {
         var thread = JSON.createObjectNode()
-                .put("id", "thread-1")
-                .put("sessionId", "session-1")
+                .put("id", threadId)
+                .put("sessionId", threadId.equals("thread-1") ? "session-1" : "session-" + threadId)
                 .put("modelProvider", "openai")
                 .put("createdAt", 1)
                 .put("updatedAt", 2)
@@ -343,31 +350,135 @@ public final class MockAppServer {
         return thread;
     }
 
-    private static ObjectNode threadHistory() {
-        var thread = thread()
+    private static ObjectNode threadMetadata(String threadId, String historyMode) {
+        var thread = thread(threadId)
                 .put("name", "SDK history")
-                .put("model", "gpt-test")
-                .put("historyMode", "paginated");
-        var userMessage = JSON.createObjectNode()
-                .put("id", "user-1")
-                .put("type", "userMessage");
-        userMessage.putArray("content")
-                .add(JSON.createObjectNode().put("type", "text").put("text", "检查项目"));
-        var agentMessage = JSON.createObjectNode()
-                .put("id", "agent-1")
-                .put("type", "agentMessage")
-                .put("phase", "final_answer")
-                .put("text", "检查完成");
+                .put("model", "gpt-test");
+        if (historyMode != null) thread.put("historyMode", historyMode);
+        return thread;
+    }
+
+    private static void readThread(BufferedWriter out, JsonNode request) throws Exception {
+        var params = request.path("params");
+        var threadId = params.path("threadId").asText();
+        var includeTurns = params.path("includeTurns").asBoolean();
+        if (includeTurns && threadId.equals("invalid-history-thread")) {
+            error(out, request, -32600, "unrelated invalid history request", null);
+            return;
+        }
+        if (includeTurns && threadId.equals("thread-1")) {
+            error(out, request, -32600, "paginated metadata should avoid includeTurns", null);
+            return;
+        }
+        if (includeTurns && threadId.equals("fallback-thread")) {
+            error(
+                    out,
+                    request,
+                    -32600,
+                    "paginated threads do not support thread/read(includeTurns=true)",
+                    null);
+            return;
+        }
+
+        var historyMode = switch (threadId) {
+            case "legacy-thread" -> "legacy";
+            case "fallback-thread", "invalid-history-thread" -> null;
+            default -> "paginated";
+        };
+        var thread = threadMetadata(threadId, historyMode);
+        if (includeTurns && threadId.equals("legacy-thread")) {
+            thread.putArray("turns").add(historyTurn(
+                    "legacy-turn",
+                    userMessage("legacy-user", "旧会话"),
+                    agentMessage("legacy-agent", "旧会话完成")));
+        }
+        var result = JSON.createObjectNode();
+        result.set("thread", thread);
+        reply(out, request, result);
+    }
+
+    private static void listThreadTurns(BufferedWriter out, JsonNode request) throws Exception {
+        var params = request.path("params");
+        var threadId = params.path("threadId").asText();
+        if (threadId.equals("unsupported-pagination-thread")) {
+            error(out, request, -32601, "unknown method thread/turns/list", null);
+            return;
+        }
+        if (threadId.equals("legacy-thread") || threadId.equals("invalid-history-thread")) {
+            error(out, request, -32600, "thread should not use paginated history", null);
+            return;
+        }
+        if (params.path("limit").asInt() != 100
+                || !params.path("sortDirection").asText().equals("asc")
+                || !params.path("itemsView").asText().equals("full")) {
+            error(out, request, -32602, "unexpected pagination options", null);
+            return;
+        }
+
+        var cursor = params.path("cursor").isTextual()
+                ? params.path("cursor").asText()
+                : null;
+        var result = JSON.createObjectNode().put("futurePageField", true);
+        var data = result.putArray("data");
+        if (threadId.equals("repeated-cursor-thread")) {
+            if (cursor == null) {
+                data.add(historyTurn("repeated-turn", userMessage("user-r", "重复游标")));
+            }
+            result.put("nextCursor", "repeated-cursor");
+            result.put("backwardsCursor", "backwards-repeated");
+            reply(out, request, result);
+            return;
+        }
+
+        if (cursor == null) {
+            data.add(historyTurn("turn-history-1", userMessage("user-1", "检查项目")));
+            result.put("nextCursor", "page-2");
+            result.put("backwardsCursor", "backwards-1");
+        } else if (cursor.equals("page-2")) {
+            data.add(historyTurn(
+                    "turn-history-2",
+                    agentMessage("agent-1", "检查完成"),
+                    JSON.createObjectNode()
+                            .put("id", "future-1")
+                            .put("type", "futureItem")
+                            .put("futureField", true)));
+            result.putNull("nextCursor");
+            result.put("backwardsCursor", "backwards-2");
+        } else {
+            error(out, request, -32602, "unexpected cursor", null);
+            return;
+        }
+        reply(out, request, result);
+    }
+
+    private static ObjectNode historyTurn(String id, ObjectNode... items) {
         var turn = JSON.createObjectNode()
-                .put("id", "turn-history-1")
+                .put("id", id)
                 .put("status", "completed")
                 .put("startedAt", 10)
                 .put("completedAt", 12)
                 .put("durationMs", 2000)
                 .put("itemsView", "full");
-        turn.putArray("items").add(userMessage).add(agentMessage);
-        thread.putArray("turns").add(turn);
-        return thread;
+        var itemArray = turn.putArray("items");
+        for (var item : items) itemArray.add(item);
+        return turn;
+    }
+
+    private static ObjectNode userMessage(String id, String text) {
+        var userMessage = JSON.createObjectNode()
+                .put("id", id)
+                .put("type", "userMessage");
+        userMessage.putArray("content")
+                .add(JSON.createObjectNode().put("type", "text").put("text", text));
+        return userMessage;
+    }
+
+    private static ObjectNode agentMessage(String id, String text) {
+        return JSON.createObjectNode()
+                .put("id", id)
+                .put("type", "agentMessage")
+                .put("phase", "final_answer")
+                .put("text", text);
     }
 
     private static ObjectNode goal(JsonNode params) {

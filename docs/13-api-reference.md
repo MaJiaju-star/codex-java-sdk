@@ -156,7 +156,7 @@ CodexClientConfig.builder()
 | 命令 | Windows 使用 `cmd.exe /d /c codex app-server`，其他平台使用 `codex app-server` |
 | clientName | `codex_java_sdk` |
 | clientTitle | `Codex Java SDK` |
-| clientVersion | `0.0.4-SNAPSHOT` |
+| clientVersion | `0.0.5-SNAPSHOT` |
 | experimentalApi | `true` |
 | requestTimeout | 60 秒 |
 | retryPolicy | 过载最多尝试 3 次，250 ms 起始指数退避 |
@@ -272,6 +272,8 @@ Thread 操作：
 
 ```java
 ThreadHistory readHistory()
+ThreadTurnsPage listTurns()
+ThreadTurnsPage listTurns(ThreadTurnsListOptions options)
 JsonNode read(boolean includeTurns)
 void setName(String name)
 void compact()
@@ -279,8 +281,24 @@ ThreadArchiveResponse archive()
 ThreadUnarchiveResponse unarchive()
 ```
 
-`readHistory()` 返回强类型 Thread 元数据和 `List<ThreadHistory.Turn>`；每个 Turn 的
-`items()` 是 `List<CodexItem>`。`read(boolean)` 是保留的原始 JSON 接口。
+`readHistory()` 自动兼容普通历史和分页历史，返回按时间正序排列的
+`List<ThreadHistory.Turn>`；每个 Turn 的 `items()` 是 `List<CodexItem>`。
+`listTurns(...)` 用于自行控制游标分页、排序方向和 Item 详情范围。
+`read(boolean)` 是保留的原始 JSON 接口，分页 Thread 不应直接使用 `read(true)`。
+
+`ThreadTurnsListOptions`：
+
+```java
+ThreadTurnsListOptions.defaults()
+ThreadTurnsListOptions.builder()
+        .cursor(String)
+        .limit(int)                  // 1..100
+        .sortDirection(SortDirection)
+        .itemsView(TurnItemsView)
+        .build()
+```
+
+`ThreadTurnsPage` 提供 `data()`、`nextCursor()`、`backwardsCursor()` 和 `raw()`。
 
 ## 5. TurnOptions
 

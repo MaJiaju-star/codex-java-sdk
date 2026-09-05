@@ -1,6 +1,7 @@
 package io.github.majiajustar.codex.thread;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.majiajustar.codex.event.CodexItem;
 import io.github.majiajustar.codex.exception.CodexTransportException;
 import io.github.majiajustar.codex.generated.v2.ThreadHistoryMode;
@@ -64,58 +65,82 @@ public record ThreadHistory(
      * @throws CodexTransportException 响应缺少 Thread 或无法按当前协议解析时抛出
      */
     public static ThreadHistory fromResponse(JsonNode response) {
-        Objects.requireNonNull(response, "response");
-        var threadNode = response.get("thread");
-        if (threadNode == null || !threadNode.isObject()) {
-            throw new CodexTransportException("thread/read response is missing thread");
-        }
-
         try {
-            var protocolThread = JsonSupport.MAPPER.treeToValue(
-                    threadNode, io.github.majiajustar.codex.generated.v2.Thread.class);
+            var threadNode = requiredThreadNode(response);
+            var protocolThread = decodeThread(threadNode);
             var protocolTurns = protocolThread.turns() == null
                     ? List.<io.github.majiajustar.codex.generated.v2.Turn>of()
                     : protocolThread.turns();
             var rawTurns = threadNode.path("turns");
             var turns = new ArrayList<Turn>(protocolTurns.size());
             for (int index = 0; index < protocolTurns.size(); index++) {
-                var protocolTurn = protocolTurns.get(index);
                 var rawTurn = rawTurns.isArray() && index < rawTurns.size()
                         ? rawTurns.get(index)
                         : JsonSupport.MAPPER.createObjectNode();
-                var rawItems = protocolTurn.items() == null
-                        ? List.<JsonNode>of()
-                        : protocolTurn.items();
-                turns.add(new Turn(
-                        protocolTurn.id(),
-                        protocolTurn.status(),
-                        protocolTurn.startedAt(),
-                        protocolTurn.completedAt(),
-                        protocolTurn.durationMs(),
-                        protocolTurn.error(),
-                        protocolTurn.itemsView(),
-                        CodexItem.fromAll(rawItems),
-                        rawTurn));
+                turns.add(Turn.fromProtocol(protocolTurns.get(index), rawTurn));
             }
-
-            return new ThreadHistory(
-                    protocolThread.id(),
-                    protocolThread.sessionId(),
-                    protocolThread.name(),
-                    protocolThread.preview(),
-                    protocolThread.cwd(),
-                    protocolThread.model(),
-                    protocolThread.modelProvider(),
-                    protocolThread.status(),
-                    protocolThread.historyMode(),
-                    protocolThread.createdAt(),
-                    protocolThread.updatedAt(),
-                    protocolThread.recencyAt(),
-                    turns,
-                    response);
+            return create(protocolThread, turns, response);
         } catch (IOException | IllegalArgumentException error) {
             throw new CodexTransportException("Unable to decode thread/read response", error);
         }
+    }
+
+    /**
+     * 将 Thread 元数据和分页获取的 Turn 合并为强类型历史。
+     *
+     * @param metadataResponse {@code thread/read(includeTurns=false)} 的完整响应
+     * @param turns 按时间顺序分页读取的强类型 Turn
+     * @return 合并后的强类型会话历史
+     * @throws CodexTransportException 元数据响应无法按当前协议解析时抛出
+     */
+    public static ThreadHistory fromMetadataResponse(
+            JsonNode metadataResponse, List<Turn> turns) {
+        Objects.requireNonNull(turns, "turns");
+        try {
+            var protocolThread = decodeThread(requiredThreadNode(metadataResponse));
+            var rawResponse = (ObjectNode) metadataResponse.deepCopy();
+            var rawTurns = ((ObjectNode) rawResponse.path("thread")).putArray("turns");
+            turns.forEach(turn -> rawTurns.add(turn.raw()));
+            return create(protocolThread, turns, rawResponse);
+        } catch (IOException | IllegalArgumentException error) {
+            throw new CodexTransportException("Unable to decode thread/read metadata", error);
+        }
+    }
+
+    private static JsonNode requiredThreadNode(JsonNode response) {
+        Objects.requireNonNull(response, "response");
+        var threadNode = response.get("thread");
+        if (threadNode == null || !threadNode.isObject()) {
+            throw new CodexTransportException("thread/read response is missing thread");
+        }
+        return threadNode;
+    }
+
+    private static io.github.majiajustar.codex.generated.v2.Thread decodeThread(JsonNode threadNode)
+            throws IOException {
+        return JsonSupport.MAPPER.treeToValue(
+                threadNode, io.github.majiajustar.codex.generated.v2.Thread.class);
+    }
+
+    private static ThreadHistory create(
+            io.github.majiajustar.codex.generated.v2.Thread protocolThread,
+            List<Turn> turns,
+            JsonNode raw) {
+        return new ThreadHistory(
+                protocolThread.id(),
+                protocolThread.sessionId(),
+                protocolThread.name(),
+                protocolThread.preview(),
+                protocolThread.cwd(),
+                protocolThread.model(),
+                protocolThread.modelProvider(),
+                protocolThread.status(),
+                protocolThread.historyMode(),
+                protocolThread.createdAt(),
+                protocolThread.updatedAt(),
+                protocolThread.recencyAt(),
+                turns,
+                raw);
     }
 
     /**
@@ -145,6 +170,21 @@ public record ThreadHistory(
         /** 创建不可变的历史轮次。 */
         public Turn {
             items = List.copyOf(items);
+        }
+
+        static Turn fromProtocol(
+                io.github.majiajustar.codex.generated.v2.Turn turn, JsonNode raw) {
+            var rawItems = turn.items() == null ? List.<JsonNode>of() : turn.items();
+            return new Turn(
+                    turn.id(),
+                    turn.status(),
+                    turn.startedAt(),
+                    turn.completedAt(),
+                    turn.durationMs(),
+                    turn.error(),
+                    turn.itemsView(),
+                    CodexItem.fromAll(rawItems),
+                    raw);
         }
     }
 }

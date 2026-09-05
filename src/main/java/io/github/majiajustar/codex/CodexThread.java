@@ -1,16 +1,25 @@
 package io.github.majiajustar.codex;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.majiajustar.codex.exception.CodexTransportException;
+import io.github.majiajustar.codex.exception.InvalidRequestException;
+import io.github.majiajustar.codex.generated.v2.SortDirection;
 import io.github.majiajustar.codex.generated.v2.ThreadArchiveResponse;
 import io.github.majiajustar.codex.generated.v2.ThreadUnarchiveResponse;
+import io.github.majiajustar.codex.generated.v2.TurnItemsView;
 import io.github.majiajustar.codex.goal.ThreadGoals;
 import io.github.majiajustar.codex.internal.JsonSupport;
 import io.github.majiajustar.codex.thread.ThreadHistory;
 import io.github.majiajustar.codex.thread.ThreadOptions;
+import io.github.majiajustar.codex.thread.ThreadTurnsListOptions;
+import io.github.majiajustar.codex.thread.ThreadTurnsPage;
 import io.github.majiajustar.codex.turn.TurnOptions;
 import io.github.majiajustar.codex.turn.TurnResult;
 import io.github.majiajustar.codex.turn.UserInput;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -19,6 +28,8 @@ import java.util.Objects;
  * <p>该对象只是一个轻量句柄。会话状态由 app-server 持有，之后可以通过 ID 恢复。
  */
 public final class CodexThread {
+    private static final int HISTORY_PAGE_LIMIT = 100;
+
     private final CodexClient client;
     private final String id;
     private final ThreadGoals goals;
@@ -96,6 +107,7 @@ public final class CodexThread {
      * 读取原始持久化会话数据。
      *
      * @param includeTurns 响应中是否包含历史轮次
+     * @return app-server 返回的原始 Thread 数据
      */
     public JsonNode read(boolean includeTurns) {
         return client.request("thread/read", JsonSupport.MAPPER.createObjectNode()
@@ -106,13 +118,84 @@ public final class CodexThread {
     /**
      * 读取并解析当前会话的持久化历史。
      *
-     * <p>返回的轮次包含强类型 {@code CodexItem}；完整原始载荷仍保留在各级 {@code raw()}
+     * <p>普通历史通过 {@code thread/read} 读取；分页历史通过 {@code thread/turns/list}
+     * 按时间正序聚合。缺少历史模式的旧服务端返回明确的分页错误时，也会自动回退到分页读取。
+     * 返回的轮次包含强类型 {@code CodexItem}，完整原始载荷仍保留在各级 {@code raw()}
      * 中，以兼容新版 app-server 字段。
      *
      * @return 强类型会话历史
      */
     public ThreadHistory readHistory() {
-        return ThreadHistory.fromResponse(read(true));
+        var metadataResponse = read(false);
+        if (isPaginated(metadataResponse)) {
+            return readPaginatedHistory(metadataResponse);
+        }
+
+        try {
+            return ThreadHistory.fromResponse(read(true));
+        } catch (InvalidRequestException error) {
+            if (isPaginatedHistoryReadError(error)) {
+                return readPaginatedHistory(metadataResponse);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * 使用服务器默认设置读取第一页 Turn 历史。
+     *
+     * @return 第一页强类型 Turn 历史
+     */
+    public ThreadTurnsPage listTurns() {
+        return listTurns(ThreadTurnsListOptions.defaults());
+    }
+
+    /**
+     * 分页读取当前会话的 Turn 历史。
+     *
+     * @param options 分页、排序和 Item 详情配置
+     * @return 一页强类型 Turn 历史
+     */
+    public ThreadTurnsPage listTurns(ThreadTurnsListOptions options) {
+        Objects.requireNonNull(options, "options");
+        var params = JsonSupport.MAPPER.valueToTree(options.toParams(id));
+        return ThreadTurnsPage.fromResponse(client.request("thread/turns/list", params));
+    }
+
+    private ThreadHistory readPaginatedHistory(JsonNode metadataResponse) {
+        var turns = new ArrayList<ThreadHistory.Turn>();
+        var seenCursors = new HashSet<String>();
+        String cursor = null;
+        while (true) {
+            var options = ThreadTurnsListOptions.builder()
+                    .cursor(cursor)
+                    .limit(HISTORY_PAGE_LIMIT)
+                    .sortDirection(SortDirection.ASC)
+                    .itemsView(TurnItemsView.FULL)
+                    .build();
+            var page = listTurns(options);
+            turns.addAll(page.data());
+            var nextCursor = page.nextCursor();
+            if (nextCursor == null) {
+                return ThreadHistory.fromMetadataResponse(metadataResponse, turns);
+            }
+            if (!seenCursors.add(nextCursor)) {
+                throw new CodexTransportException(
+                        "thread/turns/list returned a repeated cursor: " + nextCursor);
+            }
+            cursor = nextCursor;
+        }
+    }
+
+    private static boolean isPaginated(JsonNode metadataResponse) {
+        return metadataResponse.path("thread").path("historyMode").asText().equals("paginated");
+    }
+
+    private static boolean isPaginatedHistoryReadError(InvalidRequestException error) {
+        var message = error.rpcMessage().toLowerCase(Locale.ROOT);
+        return message.contains("paginated threads")
+                && message.contains("thread/read")
+                && message.contains("includeturns=true");
     }
 
     /** 为该会话设置用户可见的名称。 */
